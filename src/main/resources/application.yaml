@@ -1,0 +1,100 @@
+camel:
+  server-port: 5001
+  disable-ssl: false
+  springboot:
+    main-run-controller: true
+  dataformat:
+    json-jackson:
+      auto-discover-object-mapper: true
+
+server:
+  port: 8090
+
+zeebe:
+  client:
+    max-execution-threads: 100
+    number-of-workers: 8
+    evenly-allocated-max-jobs: "#{${zeebe.client.max-execution-threads} / ${zeebe.client.number-of-workers}}"
+    ttl: 30000
+  broker:
+    contactpoint: "127.0.0.1:26500"
+
+cloud:
+  aws:
+    bucket-name: ${AWS_BUCKET_NAME:paymenthub-ee-dev}
+    enabled: true
+    s3-base-url: "https://paymenthub-ee-dev.s3.us-east-2.amazonaws.com"
+    credentials:
+#      access-key: ${AWS_ACCESS_KEY:access_key_from_aws}
+#      secret-key: ${AWS_SECRET_KEY:secret_key_from_aws}
+      access-key: "AKIAX32JM37TZOJ5AKFB"
+      secret-key: "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"
+    region:
+      static: us-east-2
+    stack:
+      auto: false
+
+slcb:
+  auth:
+    host: https://g2p-test.slcb.com:8443
+    auth-endpoint: /api/auth
+    username: ${SLCB_USERNAME:username}
+    password: ${SLCB_PASSWORD:password}
+  api:
+    host: https://g2p-test.slcb.com:8443
+    transaction-request-endpoint: /api/transactionRequest
+    reconciliation-endpoint: /reconciliation
+    account-balance-endpoint: /accountBalance
+  signature:
+    key: ${SLCB_SIGNATURE_KEY:very_long_string}
+  account:
+    number: "003001003879112168"
+    type: 0
+  institutionCode: "SLCB"
+
+config:
+  completion-threshold-check:
+    completion-threshold: 90
+    max-retry-count: 10
+    wait-timer: PT10S
+  date-format: "yyyy-MM-dd'T'hh:mm:ssXXX"
+  reconciliation:
+    enable: false
+
+dfspids: "DFSPID"
+
+
+operations-app:
+#  contactpoint: "https://ops-bk.sandbox.fynarfin.io"
+  contactpoint: "http://localhost:5060"
+  username: "mifos"
+  password: "password"
+  endpoints:
+    auth: "/oauth/token"
+    batch-summary: "/api/v1/batch"
+    batch-detail: "/api/v1/batch/detail"
+
+bulk-processor:
+  contactoint: "https://bulk-connector.sandbox.fynarfin.io"
+  endpoints:
+    batch-transaction: "/batchtransactions"
+
+payment-mode:
+  default: "MOJALOOP"
+  mappings:
+    - id: "GSMA"
+      type: "PAYMENT"
+      endpoint: "/channel/gsma/transfer"
+    - id: "MOJALOOP"
+      type: "PAYMENT"
+      endpoint: "/channel/transfer"
+    - id: "SLCB"
+      type: "BULK"
+      endpoint: "bulk_connector_{MODE}-{dfspid}"
+    - id: "CLOSEDLOOP"
+      type: "BULK"
+      endpoint: "bulk_connector_{MODE}-{dfspid}"
+
+application:
+  bucket-name: paymenthub-ee-dev
+
