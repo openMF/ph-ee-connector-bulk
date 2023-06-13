@@ -31,7 +31,6 @@ public class BatchSummaryWorker extends BaseWorker {
             sendToCamelRoute(RouteId.BATCH_SUMMARY, exchange);
 
             boolean isBatchSummarySuccess = (boolean) exchange.getProperty(BATCH_SUMMARY_SUCCESS);
-//            boolean isBatchSummarySuccess = true;
 
             variables.put(MAX_RETRY_COUNT, maxRetryCount);
             variables.put(CURRENT_RETRY_COUNT, ++currentRetryCount);

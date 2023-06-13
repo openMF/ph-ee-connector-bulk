@@ -79,12 +79,12 @@ public class Utils {
         transactionResult.setId(transaction.getId());
         transactionResult.setRequestId(transaction.getRequestId());
         transactionResult.setPaymentMode(transaction.getPaymentMode());
-        transactionResult.setPayerIdentifierType("accountNumber");
+        transactionResult.setPayerIdentifierType(transaction.getPayerIdentifierType());
         transactionResult.setPayerIdentifier(transaction.getPayerIdentifier());
         transactionResult.setAmount(transaction.getAmount());
-        transactionResult.setCurrency(transactionResult.getCurrency());
-        transactionResult.setNote(transactionResult.getNote());
-        transactionResult.setPayeeIdentifierType("accountNumber");
+        transactionResult.setCurrency(transaction.getCurrency());
+        transactionResult.setNote(transaction.getNote());
+        transactionResult.setPayeeIdentifierType(transaction.getPayeeIdentifierType());
         if (transaction.getAccountNumber() != null) {
             transactionResult.setPayeeIdentifier(transaction.getAccountNumber());
         } else {

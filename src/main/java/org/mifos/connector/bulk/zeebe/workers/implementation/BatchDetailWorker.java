@@ -21,7 +21,7 @@ public class BatchDetailWorker extends BaseWorker {
         newWorker(Worker.BATCH_DETAILS, (client, job) -> {
             Map<String, Object> variables = job.getVariablesAsMap();
             int pageNumber = (int) variables.getOrDefault(PAGE_NO, 1);
-            int pageSize = (int) variables.getOrDefault(PAGE_SIZE, 6);
+            int pageSize = (int) variables.getOrDefault(PAGE_SIZE, 5);
             int currentTransactionCount = (int) variables.getOrDefault(CURRENT_TRANSACTION_COUNT, 0);
             int completedTransactionCount = (int) variables.getOrDefault(COMPLETED_TRANSACTION_COUNT, 0);
             int failedTransactionCount = (int) variables.getOrDefault(FAILED_TRANSACTION_COUNT, 0);
@@ -53,8 +53,6 @@ public class BatchDetailWorker extends BaseWorker {
                 sendToCamelRoute(RouteId.UPLOAD_RESULT_FILE, exchange);
             }
 
-//            currentTransactionCount += (int) exchange.getProperty(CURRENT_TRANSACTION_COUNT);
-//            currentTransactionCount += (int) variables.get(CURRENT_TRANSACTION_COUNT);
             variables.put(BATCH_DETAIL_SUCCESS, isReconciliationSuccess);
             variables.put(CURRENT_TRANSACTION_COUNT, exchange.getProperty(CURRENT_TRANSACTION_COUNT));
             variables.put(COMPLETED_TRANSACTION_COUNT, exchange.getProperty(COMPLETED_TRANSACTION_COUNT));

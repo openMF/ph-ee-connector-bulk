@@ -76,10 +76,6 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
                 .to("direct:get-transaction-array")
                 .to("direct:start-workflow-step-1");
 
-//        from("direct:start-workflow")
-//                .id("direct:start-workflow")
-//                .log("Starting route: direct:start-workflow");
-
         from("direct:start-workflow-step-1")
                 .id("direct:start-workflow-step-1")
                 .log("Starting route: direct:start-workflow-step-1")
@@ -156,48 +152,10 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
                 .to("direct:update-result-file")
                 .to("direct:upload-file");
 
-
-//        from("direct:start-workflow-step-3")
-//                .id("direct:start-workflow-step-3")
-//                .log("Starting route direct:start-workflow-step-3")
-//                .choice()
-//                // if type of payment mode is bulk
-//                .when(exchangeProperty(PAYMENT_MODE_TYPE).isEqualTo(PaymentModeType.BULK))
-//                .process(exchange -> {
-//                    String paymentMode = exchange.getProperty(PAYMENT_MODE, String.class);
-//                    PaymentModeMapping mapping = paymentModeConfiguration.getByMode(paymentMode);
-//
-//                    String tenantName = exchange.getProperty(TENANT_NAME, String.class);
-//                    Map<String, Object> variables = exchange.getProperty(ZEEBE_VARIABLE, Map.class);
-//                    variables.put(PAYMENT_MODE, paymentMode);
-//                    zeebeProcessStarter.startZeebeWorkflow(
-//                            Utils.getBulkConnectorBpmnName(mapping.getEndpoint(), mapping.getId().toLowerCase(), tenantName),
-//                            variables);
-//                    exchange.setProperty(INIT_BATCH_TRANSFER_SUCCESS, true);
-//                });
-
         from("direct:start-workflow-step-3")
                 .id("direct:start-workflow-step-3")
                 .log("Starting route direct:start-workflow-step-3")
                 .to("direct:update-payment-mode");
-//                .to("direct:batch-transaction")
-//                .to("direct:batch-transaction-response-handler");
-
-//                .choice()
-//                // if type of payment mode is bulk
-//                .when(exchangeProperty(PAYMENT_MODE_TYPE).isEqualTo(PaymentModeType.BULK))
-//                .process(exchange -> {
-//                    String paymentMode = exchange.getProperty(PAYMENT_MODE, String.class);
-//                    PaymentModeMapping mapping = paymentModeConfiguration.getByMode(paymentMode);
-//
-//                    String tenantName = exchange.getProperty(TENANT_NAME, String.class);
-//                    Map<String, Object> variables = exchange.getProperty(ZEEBE_VARIABLE, Map.class);
-//                    variables.put(PAYMENT_MODE, paymentMode);
-//                    zeebeProcessStarter.startZeebeWorkflow(
-//                            Utils.getBulkConnectorBpmnName(mapping.getEndpoint(), mapping.getId().toLowerCase(), tenantName),
-//                            variables);
-//                    exchange.setProperty(INIT_BATCH_TRANSFER_SUCCESS, true);
-//                });
 
         from("direct:update-payment-mode")
                 .id("direct:update-payment-mode")
@@ -206,114 +164,9 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
                     List<Transaction> transactions = exchange.getProperty(TRANSACTION_LIST, List.class);
                     List<Transaction> updatedTransactions= transactions.stream()
                             .map(transaction -> {transaction.setPaymentMode(defaultPaymentMode);
-                            return transaction;
+                                return transaction;
                     }).collect(Collectors.toList());
                 });
-
-        from("direct:batch-transaction")
-                .id("direct:batch-transaction")
-                .log("Starting route: " + "direct:batch-transaction")
-                .removeHeader("*")
-                .setHeader(Exchange.HTTP_METHOD, constant(HttpRequestMethod.POST))
-                .setHeader(Exchange.REST_HTTP_QUERY, simple("type=csv"))
-                .setHeader(Exchange.CONTENT_TYPE, constant("multipart"))
-//                .setHeader("X-Date", simple(ZonedDateTime.now( ZoneOffset.UTC ).format( DateTimeFormatter.ISO_INSTANT )))
-                .setHeader("Accept", constant("application/json, text/plain, */*"))
-                .setHeader("Purpose", simple("test"))
-                .setHeader("filename", simple("${exchangeProperty." + FILE_NAME + "}"))
-//                .setHeader("Platform-TenantId", simple("${exchangeProperty." + TENANT_ID + "}"))
-                .setHeader("Platform-TenantId", simple("lion"))
-                .process(exchange -> {
-                    logger.info(exchange.getIn().getHeaders().toString());
-//                    logger.info(exchange.getIn().getBody().toString());
-//                    final MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-//                    builder.addBinaryBody("file", exchange.getProperty(TRANSACTION_LIST, byte[].class),
-//                            ContentType.MULTIPART_FORM_DATA, exchange.getProperty(FILE_NAME, String.class));
-//                    builder.addTextBody("name", exchange.getProperty(FILE_NAME, String.class));
-//                    exchange.getIn().setBody(builder.build());
-
-//                    MimeMultipartDataFormat multipartDataFormat = new MimeMultipartDataFormat();
-//                    multipartDataFormat.setBinaryContent();
-//                    multipartDataFormat.setContentTypeHeader("content-type");
-//                    multipartDataFormat.setBinaryContent(true);
-//                    multipartDataFormat.setHeadersInline(false);
-//                    multipartDataFormat.setIncludeHeaders("*");
-//                    multipartDataFormat.setMultipartSubType("mixed");
-//                    multipartDataFormat.setMultipartWithoutAttachment(false);
-//                    multipartDataFormat.ma
-
-//                    CamelMessage message = new DefaultCamelMessage();
-//                    CamelMessage
-//                    DefaultMessage message = new DefaultMessage(exchange);
-//                    message.
-
-                    // try 1
-                    Message in = exchange.getIn();
-                    in.setHeader(Exchange.CONTENT_TYPE, "multipart/form-data");
-                    String filename = exchange.getProperty(FILE_NAME, String.class);
-                    byte[] csvFile = fileTransferService.downloadFile(filename, bucketName);
-                    List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
-                    String csvData = getListAsCsvString(transactionList);
-                    File file = new File(filename);
-                    file.setWritable(true);
-                    file.setReadable(true);
-                    logger.info("CSV data: " + csvData);
-                    FileWriter fileWriter = new FileWriter(file);
-                    fileWriter.write(csvData);
-                    fileWriter.close();
-
-                    // try 2
-//                    List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
-//                    String csvData = getListAsCsvString(transactionList);
-//                    MimeMultipartDataFormat multipartDataFormat = new MimeMultipartDataFormat();
-//                    multipartDataFormat.setBinaryContent(csvData);
-//
-//                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//                    ObjectOutputStream oos = new ObjectOutputStream(baos);
-//                    oos.writeObject(multipartDataFormat);
-//                    oos.flush();
-//                    oos.close();
-//
-//                    InputStream is = new ByteArrayInputStream(baos.toByteArray());
-
-                    // try 3
-//                    List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
-//                    String attContentType = "text/plain";
-//                    String attText = getListAsCsvString(transactionList);
-//                    String attFilename = exchange.getProperty(FILE_NAME, String.class);
-//                    AttachmentMessage message = exchange.getIn(AttachmentMessage.class);
-//                    message.setHeader(Exchange.CONTENT_TYPE, "text/plain");
-//                    message.setHeader(Exchange.CONTENT_ENCODING, "UTF8");
-//                    Map<String, String> headers = new HashMap<>();
-//                    headers.put("Purpose", "test");
-//                    headers.put("filename", "test.csv");
-//                    headers.put("Platform-TenantId", "lion");
-//                    addAttachment(attContentType, attText, attFilename,headers, message);
-                    in.setBody(file);
-
-
-                })
-//                .marshal().mimeMultipart("related", true, true, "(included|x-.*)", true)
-//                .marshal().mimeMultipart()
-//                .toD(bulkProcessorContactPoint + bulkProcessorEndPoint + "?bridgeEndpoint=true&throwExceptionOnFailure=false")
-
-                .toD("https://webhook.site/1b6463a8-f183-4afb-bf31-ef0378b29aab" + "?bridgeEndpoint=true&throwExceptionOnFailure=false&multipart=true")
-                //.toD("http://localhost:5002/batchtransactions" + "?bridgeEndpoint=true&throwExceptionOnFailure=false&multipart=true")
-                .log(LoggingLevel.INFO, "Batch transaction API response: \n\n ${body}");
-
-        from("direct:batch-transaction-response-handler")
-                .id("direct:batch-transaction-response-handler")
-                .log("Starting route direct:batch-transaction-response-handler")
-                .choice()
-                .when(header("CamelHttpResponseCode").isEqualTo(200))
-                .process(exchange -> {
-                    logger.info("reached here");
-                    exchange.setProperty(INIT_BATCH_TRANSFER_SUCCESS, true);})
-                .otherwise()
-                .process(exchange -> {
-                    exchange.setProperty(INIT_BATCH_TRANSFER_SUCCESS, false);
-                })
-                .endChoice();
     }
 
     private List<TransactionResult> updateTransactionStatusToFailed(List<Transaction> transactionList) {
@@ -349,14 +202,6 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
         }
         return stringBuilder.toString();
     }
-
-//    private MultiPartSpecification getMultiPart(String fileContent) {
-//        return new MultiPartSpecBuilder(fileContent.getBytes()).
-//                fileName("zeebe-test.bpmn").
-//                controlName("file").
-//                mimeType("text/plain").
-//                build();
-//    }
 
     private void addAttachment(String attContentType, String attText, String attFileName, Map<String, String> headers,
                                AttachmentMessage message)

@@ -45,16 +45,17 @@ public class BatchTransferWorker extends BaseWorker {
             exchange.setProperty(BATCH_ID, variables.get(BATCH_ID));
             exchange.setProperty(REQUEST_ID, variables.get(REQUEST_ID));
             exchange.setProperty(PURPOSE, variables.get(PURPOSE));
+            logger.info("Source batchId: " + variables.get(BATCH_ID));
 
             producerTemplate.send("direct:initBatchTransfer", exchange);
 
-            // try with rest template
             String filename = (String) variables.get(FILE_NAME);
             List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
             String csvData = getListAsCsvString(transactionList);
+            logger.info("Print CSV Data: " + csvData);
             String batchId = invokeBatchTransactionApi(filename, csvData);
-
             variables.put(BATCH_ID, batchId);
+            logger.info("Destination batchId: " + batchId);
 
             client.newCompleteCommand(job.getKey()).variables(variables).send();
         });
@@ -100,7 +101,6 @@ public class BatchTransferWorker extends BaseWorker {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
-//        String batchId = jsonNode.get("PollingPath").asText().split("/")[3];
     }
 
     public String getListAsCsvString(List<Transaction> list){
@@ -119,7 +119,6 @@ public class BatchTransferWorker extends BaseWorker {
                     .append(transaction.getAmount()).append(",")
                     .append(transaction.getCurrency()).append(",")
                     .append(transaction.getNote()).append("\n");
-
         }
         return stringBuilder.toString();
     }

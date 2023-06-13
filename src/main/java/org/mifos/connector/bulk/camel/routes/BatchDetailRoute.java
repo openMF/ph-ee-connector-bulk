@@ -48,14 +48,9 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                                         PAGE_SIZE + "=${exchangeProperty." + PAGE_SIZE + "}"
                         )
                 )
-//                .setHeader(Exchange.REST_HTTP_QUERY, simple("batchId=${exchangeProperty." + BATCH_ID + "}"))
-//                .setHeader(Exchange.REST_HTTP_QUERY, simple("pageNo=${exchangeProperty." + PAGE_NO + "}"))
-//                .setHeader(Exchange.REST_HTTP_QUERY, simple("pageSize=${exchangeProperty." + PAGE_SIZE + "}"))
 //                .setHeader("Authorization", simple("Bearer ${exchangeProperty."+OPS_APP_ACCESS_TOKEN+"}"))
 //                .setHeader("Platform-TenantId", simple("${exchangeProperty." + TENANT_ID + "}"))
                 .setHeader("Platform-TenantId", simple("rhino"))
-//                .setHeader("pageNo", simple("${exchangeProperty." + PAGE_NO + "}"))
-//                .setHeader("pageSize", simple("${exchangeProperty." + PAGE_SIZE + "}"))
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
@@ -154,32 +149,30 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                 .to("direct:get-transaction-array")
                 .process(exchange -> {
                     String serverFileName = exchange.getProperty(FILE_NAME, String.class);
+                    String batchId = exchange.getProperty(BATCH_ID, String.class);
                     String resultFile = String.format("Result_%s", serverFileName);
                     List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
-//                    Map<String, String> requestIdStatusMap = (Map<String, String>);
                     Object property = exchange.getProperty(REQUEST_ID_STATUS_MAP);
                     Map<String, String> requestIdStatusMap = (Map<String, String>) property;
-                    List<TransactionResult> transactionResultList = fetchTransactionResult(transactionList, requestIdStatusMap, requestIdStatusMap);
+                    List<TransactionResult> transactionResultList = fetchTransactionResult(transactionList, requestIdStatusMap, requestIdStatusMap, batchId);
                     exchange.setProperty(RESULT_TRANSACTION_LIST, transactionResultList);
                     exchange.setProperty(RESULT_FILE, resultFile);
                     exchange.setProperty(LOCAL_FILE_PATH, exchange.getProperty(RESULT_FILE));
                     exchange.setProperty(OVERRIDE_HEADER, constant(true));
                 })
-//                .to("direct:update-status")
                 .to("direct:update-result-file")
                 .to("direct:upload-file");
 
     }
 
-    private List<TransactionResult> fetchTransactionResult(List<Transaction> transactionList, Object property, Map<String, String> requestIdStatusMap) {
+    private List<TransactionResult> fetchTransactionResult(List<Transaction> transactionList, Object property, Map<String, String> requestIdStatusMap, String batchId) {
         List<TransactionResult> transactionResultList = new ArrayList<>();
         for (Transaction transaction : transactionList) {
             TransactionResult transactionResult = Utils.mapToResultDTO(transaction);
             transactionResult.setPaymentMode("CLOSEDLOOP");
-            transactionResult.setStatus(requestIdStatusMap.get(transaction.getRequestId()));
-//            transactionResult.setErrorCode("404");
-//            transactionResult.setErrorDescription("Payment mode not configured");
-//            transactionResult.setStatus("Failed");
+            transactionResult.setBatchId(batchId);
+            String status = requestIdStatusMap.get(transaction.getRequestId());
+            transactionResult.setStatus(status);
             transactionResultList.add(transactionResult);
         }
         return transactionResultList;
