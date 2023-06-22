@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,9 +46,11 @@ public class FileProcessingRoute extends BaseRouteBuilder {
                 .id("direct:get-transaction-array")
                 .log("Starting route direct:get-transaction-array")
                 .process(exchange -> {
-                    Double totalAmount = 0.0;
-                    Long failedAmount = 0L;
-                    Long completedAmount = 0L;
+
+                    // review comment: use big decimal or Long for amounts
+                    BigDecimal totalAmount = BigDecimal.ZERO;
+                    BigDecimal failedAmount = BigDecimal.ZERO;
+                    BigDecimal completedAmount = BigDecimal.ZERO;
                     String filename = exchange.getProperty(FILE_NAME, String.class);
                     CsvSchema schema = CsvSchema.emptySchema().withHeader();
                     FileReader reader = new FileReader(filename);
@@ -56,7 +59,7 @@ public class FileProcessingRoute extends BaseRouteBuilder {
                     while (readValues.hasNext()) {
                         Transaction current = readValues.next();
                         transactionList.add(current);
-                        totalAmount += Double.parseDouble(current.getAmount());
+                        totalAmount = totalAmount.add(new BigDecimal(current.getAmount()));
                     }
                     reader.close();
                     exchange.setProperty(TRANSACTION_LIST, transactionList);
@@ -78,15 +81,14 @@ public class FileProcessingRoute extends BaseRouteBuilder {
                 .id("direct:update-result-file")
                 .log("Starting route direct:update-result-file")
                 .process(exchange -> {
-                    String filepath = exchange.getProperty(LOCAL_FILE_PATH, String.class);
+                    String filePath = exchange.getProperty(LOCAL_FILE_PATH, String.class);
                     List<TransactionResult> transactionList = exchange.getProperty(RESULT_TRANSACTION_LIST, List.class);
 
+                    // review comment: remove below loop as it is used for debugging
                     for(TransactionResult result : transactionList){
                         logger.info(result.toString());
                     }
-                    // getting header
-//                    Boolean overrideHeader = exchange.getProperty(OVERRIDE_HEADER, Boolean.class);
-                    csvWriter(transactionList, TransactionResult.class, csvMapper, true, filepath);
+                    csvWriter(transactionList, TransactionResult.class, csvMapper, true, filePath);
                 })
                 .log("Update complete");
 

@@ -3,7 +3,9 @@ package org.mifos.connector.bulk.camel.routes;
 import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.model.dataformat.JsonLibrary;
+import org.mifos.connector.bulk.config.MockPaymentSchemaConfig;
 import org.mifos.connector.bulk.schema.BatchDTO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,12 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
     @Value("${config.completion-threshold-check.completion-threshold}")
     private int completionThreshold;
 
+    @Autowired
+    public MockPaymentSchemaConfig mockPaymentSchemaConfig;
+
+    @Value("${tenant}")
+    public String tenant;
+
     private static final String OPS_APP_ACCESS_TOKEN = "opsAppAccessToken";
 
     @Override
@@ -25,27 +33,17 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
         from(RouteId.BATCH_SUMMARY.getValue())
                 .id(RouteId.BATCH_SUMMARY.getValue())
                 .log("Starting route " + RouteId.BATCH_SUMMARY.name())
-//                .to("direct:get-access-token")
-//                .choice()
-//                .when(exchange -> exchange.getProperty(OPS_APP_ACCESS_TOKEN, String.class) != null)
-//                .log(LoggingLevel.INFO, "Got access token, moving on to API call")
                 .to("direct:batch-summary")
                 .to("direct:batch-summary-response-handler");
-//                .otherwise()
-//                .log(LoggingLevel.INFO, "Authentication failed.")
-//                .endChoice();
 
 
         getBaseExternalApiRequestRouteDefinition("batch-summary", HttpRequestMethod.GET)
                 .setHeader(Exchange.REST_HTTP_QUERY, simple("batchId=${exchangeProperty." + BATCH_ID + "}"))
-//                .setHeader("Authorization", simple("Bearer ${exchangeProperty."+OPS_APP_ACCESS_TOKEN+"}"))
-//                .setHeader("Platform-TenantId", simple("${exchangeProperty." + TENANT_ID + "}"))
-                .setHeader("Platform-TenantId", simple("rhino"))
+                .setHeader("Platform-TenantId", simple(tenant))
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
-//                .toD(operationsAppConfig.batchSummaryUrl + "?bridgeEndpoint=true")
-                .toD("http://localhost:8080/mockapi/v1/batch/summary" + "?bridgeEndpoint=true")
+                .toD(mockPaymentSchemaConfig.batchSummaryUrl + "?bridgeEndpoint=true")
                 .log(LoggingLevel.INFO, "Batch summary API response: \n\n ${body}");
 
         from("direct:batch-summary-response-handler")

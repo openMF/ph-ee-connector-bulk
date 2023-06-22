@@ -69,8 +69,9 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
     @Override
     public void configure() throws Exception {
 
-        from("direct:initBatchTransfer")
-                .id("direct:initBatchTransfer")
+        // review comment: do not use camel case for routes
+        from("direct:init-batch-transfer")
+                .id("direct:init-batch-transfer")
                 .log("Starting route: " + RouteId.INIT_BATCH_TRANSFER.getValue())
                 .to("direct:download-file")
                 .to("direct:get-transaction-array")
@@ -78,7 +79,7 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
 
         from("direct:start-workflow-step-1")
                 .id("direct:start-workflow-step-1")
-                .log("Starting route: direct:start-workflow-step-1")
+                .log("Starting route: start-workflow-step-1")
                 .process(exchange -> {
                     List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
 
@@ -145,9 +146,9 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
                 .setProperty(LOCAL_FILE_PATH, exchangeProperty(RESULT_FILE))
                 .setProperty(OVERRIDE_HEADER, constant(true))
                 .process(exchange -> {
-                    logger.info("A1 {}", exchange.getProperty(RESULT_FILE));
-                    logger.info("A2 {}", exchange.getProperty(LOCAL_FILE_PATH));
-                    logger.info("A3 {}", exchange.getProperty(OVERRIDE_HEADER));
+                    logger.debug("A1 {}", exchange.getProperty(RESULT_FILE));
+                    logger.debug("A2 {}", exchange.getProperty(LOCAL_FILE_PATH));
+                    logger.debug("A3 {}", exchange.getProperty(OVERRIDE_HEADER));
                 })
                 .to("direct:update-result-file")
                 .to("direct:upload-file");
@@ -181,7 +182,6 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
         return transactionResultList;
     }
 
-
     public String getListAsCsvString(List<Transaction> list){
 
         StringBuilder stringBuilder = new StringBuilder();
@@ -202,19 +202,4 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
         }
         return stringBuilder.toString();
     }
-
-    private void addAttachment(String attContentType, String attText, String attFileName, Map<String, String> headers,
-                               AttachmentMessage message)
-            throws IOException {
-        DataSource ds = new ByteArrayDataSource(attText.getBytes(), attContentType);
-        DefaultAttachment attachment = new DefaultAttachment(ds);
-        if (headers != null) {
-            for (Map.Entry<String, String> entry : headers.entrySet()) {
-                attachment.addHeader(entry.getKey(), entry.getValue());
-            }
-        }
-        message.addAttachmentObject(attFileName, attachment);
-    }
-
-
 }

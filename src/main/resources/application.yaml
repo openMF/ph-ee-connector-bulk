@@ -16,6 +16,7 @@ zeebe:
     number-of-workers: 8
     evenly-allocated-max-jobs: "#{${zeebe.client.max-execution-threads} / ${zeebe.client.number-of-workers}}"
     ttl: 30000
+    max-jobs-active: 2000
   broker:
     contactpoint: "127.0.0.1:26500"
 
@@ -25,32 +26,13 @@ cloud:
     enabled: true
     s3-base-url: "https://paymenthub-ee-dev.s3.us-east-2.amazonaws.com"
     credentials:
-#      access-key: ${AWS_ACCESS_KEY:access_key_from_aws}
-#      secret-key: ${AWS_SECRET_KEY:secret_key_from_aws}
-      access-key: "AKIAX32JM37TZOJ5AKFB"
-      secret-key: "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"
+      access-key: ${AWS_ACCESS_KEY:access_key_from_aws}
+      secret-key: ${AWS_SECRET_KEY:secret_key_from_aws}
     region:
       static: us-east-2
     stack:
       auto: false
 
-slcb:
-  auth:
-    host: https://g2p-test.slcb.com:8443
-    auth-endpoint: /api/auth
-    username: ${SLCB_USERNAME:username}
-    password: ${SLCB_PASSWORD:password}
-  api:
-    host: https://g2p-test.slcb.com:8443
-    transaction-request-endpoint: /api/transactionRequest
-    reconciliation-endpoint: /reconciliation
-    account-balance-endpoint: /accountBalance
-  signature:
-    key: ${SLCB_SIGNATURE_KEY:very_long_string}
-  account:
-    number: "003001003879112168"
-    type: 0
-  institutionCode: "SLCB"
 
 config:
   completion-threshold-check:
@@ -73,6 +55,12 @@ operations-app:
     auth: "/oauth/token"
     batch-summary: "/api/v1/batch"
     batch-detail: "/api/v1/batch/detail"
+
+mock-payment-schema:
+  contactpoint: "http://localhost:8080"
+  endpoints:
+    batch-summary: "/mockapi/v1/batch"
+    batch-detail: "/mockapi/v1/batch/detail"
 
 bulk-processor:
   contactoint: "https://bulk-connector.sandbox.fynarfin.io"
@@ -97,4 +85,6 @@ payment-mode:
 
 application:
   bucket-name: paymenthub-ee-dev
+
+tenant: "rhino"
 

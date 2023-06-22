@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.support.DefaultExchange;
+import org.mifos.connector.bulk.camel.routes.RouteId;
 import org.mifos.connector.bulk.schema.Transaction;
 import org.mifos.connector.bulk.zeebe.workers.BaseWorker;
 import org.mifos.connector.bulk.zeebe.workers.Worker;
@@ -47,7 +48,7 @@ public class BatchTransferWorker extends BaseWorker {
             exchange.setProperty(PURPOSE, variables.get(PURPOSE));
             logger.info("Source batchId: " + variables.get(BATCH_ID));
 
-            producerTemplate.send("direct:initBatchTransfer", exchange);
+            sendToCamelRoute(RouteId.INIT_BATCH_TRANSFER, exchange);
 
             String filename = (String) variables.get(FILE_NAME);
             List<Transaction> transactionList = exchange.getProperty(TRANSACTION_LIST, List.class);
@@ -69,8 +70,12 @@ public class BatchTransferWorker extends BaseWorker {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.add("Purpose", "test purpose");
         headers.add("filename", filename);
+
+        // review comment: review hard coding of rhino
         headers.add("Platform-TenantId", "rhino");
         MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
+
+        // review comment: review hard coding of below parameters
         ContentDisposition contentDisposition = ContentDisposition
                 .builder("form-data")
                 .name("file")
@@ -88,7 +93,7 @@ public class BatchTransferWorker extends BaseWorker {
                     HttpMethod.POST,
                     requestEntity,
                     String.class);
-            logger.info(response.toString());
+            logger.debug(response.toString());
         } catch (HttpClientErrorException e) {
             e.printStackTrace();
         }

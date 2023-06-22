@@ -1,11 +1,11 @@
 package org.mifos.connector.bulk.camel.routes;
 
 public enum RouteId {
-    INIT_BATCH_TRANSFER("direct:initBatchTransfer"),
+    INIT_BATCH_TRANSFER("direct:init-batch-transfer"),
 
-    BATCH_SUMMARY("direct:batchSummary"),
+    BATCH_SUMMARY("direct:batch-summary"),
 
-    BATCH_DETAIL("direct:batchDetail"),
+    BATCH_DETAIL("direct:batch-detail"),
 
     UPLOAD_RESULT_FILE("direct:upload-result-file");
 

@@ -3,8 +3,10 @@ package org.mifos.connector.bulk.camel.routes;
 import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.model.dataformat.JsonLibrary;
+import org.mifos.connector.bulk.config.MockPaymentSchemaConfig;
 import org.mifos.connector.bulk.schema.*;
 import org.mifos.connector.bulk.utils.Utils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +23,12 @@ public class BatchDetailRoute extends BaseRouteBuilder {
     @Value("${config.completion-threshold-check.completion-threshold}")
     private int completionThreshold;
 
+    @Value("${tenant}")
+    public String tenant;
+
+    @Autowired
+    public MockPaymentSchemaConfig mockPaymentSchemaConfig;
+
     private static final String OPS_APP_ACCESS_TOKEN = "opsAppAccessToken";
 
     @Override
@@ -29,16 +37,8 @@ public class BatchDetailRoute extends BaseRouteBuilder {
         from(RouteId.BATCH_DETAIL.getValue())
                 .id(RouteId.BATCH_DETAIL.getValue())
                 .log("Starting route " + RouteId.BATCH_DETAIL.name())
-//                .to("direct:get-access-token")
-//                .choice()
-//                .when(exchange -> exchange.getProperty(OPS_APP_ACCESS_TOKEN, String.class) != null)
-//                .log(LoggingLevel.INFO, "Got access token, moving on to API call")
                 .to("direct:batch-detail")
                 .to("direct:batch-detail-response-handler");
-//                .otherwise()
-//                .log(LoggingLevel.INFO, "Authentication failed.")
-//                .endChoice();
-
         getBaseExternalApiRequestRouteDefinition("batch-detail", HttpRequestMethod.GET)
                 .setHeader(
                         Exchange.REST_HTTP_QUERY,
@@ -48,20 +48,19 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                                         PAGE_SIZE + "=${exchangeProperty." + PAGE_SIZE + "}"
                         )
                 )
-//                .setHeader("Authorization", simple("Bearer ${exchangeProperty."+OPS_APP_ACCESS_TOKEN+"}"))
-//                .setHeader("Platform-TenantId", simple("${exchangeProperty." + TENANT_ID + "}"))
-                .setHeader("Platform-TenantId", simple("rhino"))
+
+                // review comment: remove hardcoding
+                .setHeader("Platform-TenantId", simple(tenant))
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
-//                .toD(operationsAppConfig.batchDetailUrl +  "?bridgeEndpoint=true&throwExceptionOnFailure=false")
-                .toD("http://localhost:8080/mockapi/v1/batch/detail" +  "?bridgeEndpoint=true&throwExceptionOnFailure=false")
-                .log(LoggingLevel.INFO, "Batch detail API response: \n\n ${body}");
+
+                .toD(mockPaymentSchemaConfig.batchDetailUrl + "bridgeEndpoint=true&throwExceptionOnFailure=false")
+                .log(LoggingLevel.DEBUG, "Batch detail API response: \n\n ${body}");
 
         from("direct:batch-detail-response-handler")
                 .id("direct:batch-detail-response-handler")
                 .log("Starting route direct:batch-detail-response-handler")
-                //.setBody(exchange -> exchange.getIn().getBody(String.class))
                 .choice()
                 .when(header("CamelHttpResponseCode").isEqualTo("200"))
                 .log(LoggingLevel.INFO, "Batch detail request successful")
@@ -88,14 +87,14 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                     int failedTransferCountPerPage = 0;
                     int transferCountPerPage = 0;
 
-                    Map<String, String> previousRequestIdStatusMap;
+                    Map<String, String> requestIdStatusMap;
                     if(exchange.getProperty(REQUEST_ID_STATUS_MAP)!=null){
-                        previousRequestIdStatusMap = (Map<String, String>) exchange.getProperty(REQUEST_ID_STATUS_MAP);
+                        requestIdStatusMap = (Map<String, String>) exchange.getProperty(REQUEST_ID_STATUS_MAP);
                     }
                     else{
-                        previousRequestIdStatusMap = new HashMap<>();
+                        requestIdStatusMap = new HashMap<>();
                     }
-                    Map<String, String> requestIdStatusMap = new HashMap<>(previousRequestIdStatusMap);
+
                     for(Transfer transfer : transfers){
                         TransferStatus transferStatus = transfer.getStatus();
                         requestIdStatusMap.put(transfer.getTransactionId(), transferStatus.toString());
@@ -117,6 +116,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                     failedTransferCount += failedTransferCountPerPage;
                     ongoingTransferCount += ongoingTransferCountPerPage;
 
+                    // review comment: risky operation
                     exchange.setProperty(CURRENT_TRANSACTION_COUNT, currentTransferCount);
                     exchange.setProperty(COMPLETED_TRANSACTION_COUNT, completedTransferCount);
                     exchange.setProperty(FAILED_TRANSACTION_COUNT, failedTransferCount);
@@ -131,7 +131,6 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                     }
 
                 })
-//                .to("direct:upload-result-file")
                 .otherwise()
                 .log(LoggingLevel.ERROR, "Batch detail request unsuccessful")
                 .process(exchange -> {
@@ -162,7 +161,6 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                 })
                 .to("direct:update-result-file")
                 .to("direct:upload-file");
-
     }
 
     private List<TransactionResult> fetchTransactionResult(List<Transaction> transactionList, Object property, Map<String, String> requestIdStatusMap, String batchId) {

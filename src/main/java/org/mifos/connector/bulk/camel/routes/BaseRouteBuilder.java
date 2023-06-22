@@ -5,6 +5,7 @@ import io.camunda.zeebe.client.ZeebeClient;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.RouteDefinition;
+import org.mifos.connector.bulk.config.MockPaymentSchemaConfig;
 import org.mifos.connector.bulk.config.OperationsAppConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
