@@ -39,6 +39,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                 .log("Starting route " + RouteId.BATCH_DETAIL.name())
                 .to("direct:batch-detail")
                 .to("direct:batch-detail-response-handler");
+
         getBaseExternalApiRequestRouteDefinition("batch-detail", HttpRequestMethod.GET)
                 .setHeader(
                         Exchange.REST_HTTP_QUERY,
@@ -48,13 +49,10 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                                         PAGE_SIZE + "=${exchangeProperty." + PAGE_SIZE + "}"
                         )
                 )
-
-                // review comment: remove hardcoding
                 .setHeader("Platform-TenantId", simple(tenant))
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
-
                 .toD(mockPaymentSchemaConfig.batchDetailUrl + "bridgeEndpoint=true&throwExceptionOnFailure=false")
                 .log(LoggingLevel.DEBUG, "Batch detail API response: \n\n ${body}");
 
@@ -116,7 +114,6 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                     failedTransferCount += failedTransferCountPerPage;
                     ongoingTransferCount += ongoingTransferCountPerPage;
 
-                    // review comment: risky operation
                     exchange.setProperty(CURRENT_TRANSACTION_COUNT, currentTransferCount);
                     exchange.setProperty(COMPLETED_TRANSACTION_COUNT, completedTransferCount);
                     exchange.setProperty(FAILED_TRANSACTION_COUNT, failedTransferCount);

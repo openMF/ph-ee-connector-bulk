@@ -46,8 +46,6 @@ public class FileProcessingRoute extends BaseRouteBuilder {
                 .id("direct:get-transaction-array")
                 .log("Starting route direct:get-transaction-array")
                 .process(exchange -> {
-
-                    // review comment: use big decimal or Long for amounts
                     BigDecimal totalAmount = BigDecimal.ZERO;
                     BigDecimal failedAmount = BigDecimal.ZERO;
                     BigDecimal completedAmount = BigDecimal.ZERO;

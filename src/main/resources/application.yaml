@@ -63,7 +63,8 @@ mock-payment-schema:
     batch-detail: "/mockapi/v1/batch/detail"
 
 bulk-processor:
-  contactoint: "https://bulk-connector.sandbox.fynarfin.io"
+#  contactoint: "https://bulk-connector.sandbox.fynarfin.io"
+  contactpoint: "http://localhost:5002/batchtransactions"
   endpoints:
     batch-transaction: "/batchtransactions"
 

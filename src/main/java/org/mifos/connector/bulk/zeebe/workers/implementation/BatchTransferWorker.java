@@ -18,6 +18,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,15 @@ public class BatchTransferWorker extends BaseWorker {
 
     @Value("${config.completion-threshold-check.wait-timer}")
     private String waitTimer;
+
+    @Value("${bulk-processor.contactpoint}")
+    private String bulkProcessorContactPoint;
+
+    @Value("${bulk-processor.endpoint}")
+    private String batchTransactionEndpoint;
+
+    @Value("${tenant}")
+    public String tenant;
 
     @Override
     public void setup() {
@@ -70,26 +80,28 @@ public class BatchTransferWorker extends BaseWorker {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.add("Purpose", "test purpose");
         headers.add("filename", filename);
+        headers.add("Platform-TenantId", tenant);
 
-        // review comment: review hard coding of rhino
-        headers.add("Platform-TenantId", "rhino");
-        MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
-
-        // review comment: review hard coding of below parameters
         ContentDisposition contentDisposition = ContentDisposition
                 .builder("form-data")
                 .name("file")
-                .filename("test.csv")
+//                .filename("test.csv")
+                .filename(filename)
                 .build();
+
+        MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
         fileMap.add(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
         HttpEntity<byte[]> fileEntity = new HttpEntity<>(csvData.getBytes(), fileMap);
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", fileEntity);
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+        String batchTransactionUrl = bulkProcessorContactPoint + batchTransactionEndpoint;
+        String url = UriComponentsBuilder.fromHttpUrl(batchTransactionUrl)
+                .queryParam("type", "csv").toUriString();
         try {
             response = restTemplate.exchange(
-                    // when adding correct url. add query param type=csv
-                    "http://localhost:5002/batchtransactions?type=csv",
+                    url,
                     HttpMethod.POST,
                     requestEntity,
                     String.class);
