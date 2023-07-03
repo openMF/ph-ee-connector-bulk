@@ -70,4 +70,9 @@ public class AzureFileTransferImpl implements FileTransferService {
     public void deleteFile(String fileName, String bucketName) {
         client.containerName(bucketName).blobName(fileName).buildClient().delete();
     }
+
+    @Override
+    public byte[] downloadFileAsStream(String fileName, String bucketName) {
+        return new byte[0];
+    }
 }

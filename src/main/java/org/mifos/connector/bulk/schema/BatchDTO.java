@@ -2,6 +2,7 @@ package org.mifos.connector.bulk.schema;
 
 import java.math.BigDecimal;
 
+// TODO: Duplicate file (Also exists in <service-name>)
 public class BatchDTO {
 
     private String batch_id;

@@ -183,7 +183,6 @@ public class InitBatchTransferRoute extends BaseRouteBuilder {
     }
 
     public String getListAsCsvString(List<Transaction> list){
-
         StringBuilder stringBuilder = new StringBuilder();
 
         stringBuilder.append("id,request_id,payment_mode,payer_identifier_type,payer_identifier,payee_identifier_type,payee_identifier,amount,currency,note\n");

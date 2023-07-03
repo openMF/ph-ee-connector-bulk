@@ -18,7 +18,6 @@ public class BatchDetailWorker extends BaseWorker {
     @Override
     public void setup() {
 
-        // review comment: make the below method shorter
         newWorker(Worker.BATCH_DETAILS, (client, job) -> {
             Map<String, Object> variables = job.getVariablesAsMap();
             int pageNumber = (int) variables.getOrDefault(PAGE_NO, 1);

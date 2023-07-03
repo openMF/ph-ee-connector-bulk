@@ -25,19 +25,17 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
     @Value("${tenant}")
     public String tenant;
 
-    private static final String OPS_APP_ACCESS_TOKEN = "opsAppAccessToken";
-
     @Override
     public void configure() throws Exception {
 
         from(RouteId.BATCH_SUMMARY.getValue())
                 .id(RouteId.BATCH_SUMMARY.getValue())
                 .log("Starting route " + RouteId.BATCH_SUMMARY.name())
-                .to("direct:batch-summary")
+                .to("direct:batch-summary-api-call")
                 .to("direct:batch-summary-response-handler");
 
 
-        getBaseExternalApiRequestRouteDefinition("batch-summary", HttpRequestMethod.GET)
+        getBaseExternalApiRequestRouteDefinition("batch-summary-api-call", HttpRequestMethod.GET)
                 .setHeader(Exchange.REST_HTTP_QUERY, simple("batchId=${exchangeProperty." + BATCH_ID + "}"))
                 .setHeader("Platform-TenantId", simple(tenant))
                 .process(exchange -> {

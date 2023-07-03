@@ -29,18 +29,16 @@ public class BatchDetailRoute extends BaseRouteBuilder {
     @Autowired
     public MockPaymentSchemaConfig mockPaymentSchemaConfig;
 
-    private static final String OPS_APP_ACCESS_TOKEN = "opsAppAccessToken";
-
     @Override
     public void configure() throws Exception {
 
         from(RouteId.BATCH_DETAIL.getValue())
                 .id(RouteId.BATCH_DETAIL.getValue())
                 .log("Starting route " + RouteId.BATCH_DETAIL.name())
-                .to("direct:batch-detail")
+                .to("direct:batch-detail-api-call")
                 .to("direct:batch-detail-response-handler");
 
-        getBaseExternalApiRequestRouteDefinition("batch-detail", HttpRequestMethod.GET)
+        getBaseExternalApiRequestRouteDefinition("batch-detail-api-call", HttpRequestMethod.GET)
                 .setHeader(
                         Exchange.REST_HTTP_QUERY,
                         simple(

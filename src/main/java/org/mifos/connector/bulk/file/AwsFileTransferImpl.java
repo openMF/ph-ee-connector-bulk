@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -56,6 +58,29 @@ public class AwsFileTransferImpl implements FileTransferService {
     @Override
     public void deleteFile(String fileName, String bucketName) {
         s3Client.deleteObject(bucketName, fileName);
+    }
+
+    @Override
+    public byte[] downloadFileAsStream(String fileName, String bucketName){
+        S3Object s3Object = s3Client.getObject(bucketName, fileName);
+        S3ObjectInputStream inputStream = s3Object.getObjectContent();
+
+        try{
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            int numberOfBytesToWrite;
+            byte[] data = new byte[1024];
+
+            while ((numberOfBytesToWrite = inputStream.read(data, 0, data.length)) != -1){
+                outputStream.write(data, 0, numberOfBytesToWrite);
+            }
+            inputStream.close();
+            outputStream.close();
+            return outputStream.toByteArray();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+        return new byte[0];
     }
 
     private File convertMultiPartFileToFile(MultipartFile file) {

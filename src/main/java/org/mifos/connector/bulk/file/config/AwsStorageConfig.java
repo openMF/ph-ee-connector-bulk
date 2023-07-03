@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+// TODO: Duplicate file (Also exists in <service-name>)
 @Configuration
 public class AwsStorageConfig {
 
