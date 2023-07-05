@@ -81,11 +81,6 @@ public class FileProcessingRoute extends BaseRouteBuilder {
                 .process(exchange -> {
                     String filePath = exchange.getProperty(LOCAL_FILE_PATH, String.class);
                     List<TransactionResult> transactionList = exchange.getProperty(RESULT_TRANSACTION_LIST, List.class);
-
-                    // review comment: remove below loop as it is used for debugging
-                    for(TransactionResult result : transactionList){
-                        logger.info(result.toString());
-                    }
                     csvWriter(transactionList, TransactionResult.class, csvMapper, true, filePath);
                 })
                 .log("Update complete");
