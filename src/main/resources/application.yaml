@@ -26,11 +26,8 @@ cloud:
     enabled: true
     s3-base-url: "https://paymenthub-ee-dev.s3.us-east-2.amazonaws.com"
     credentials:
-#      access-key: ${AWS_ACCESS_KEY:access_key_from_aws}
-#      secret-key: ${AWS_SECRET_KEY:secret_key_from_aws}
-      access-key: "AKIAX32JM37TZOJ5AKFB"
-      secret-key: "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"
-
+      access-key: ${AWS_ACCESS_KEY:access_key_from_aws}
+      secret-key: ${AWS_SECRET_KEY:secret_key_from_aws}
     region:
       static: us-east-2
     stack:
@@ -62,7 +59,7 @@ operations-app:
 mock-payment-schema:
   contactpoint: "http://localhost:8080"
   endpoints:
-    batch-summary: "/mockapi/v1/batch"
+    batch-summary: "/mockapi/v1/batch/summary"
     batch-detail: "/mockapi/v1/batch/detail"
 
 bulk-processor:

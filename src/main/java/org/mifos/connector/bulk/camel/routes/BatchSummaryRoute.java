@@ -41,7 +41,7 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
-                .toD(mockPaymentSchemaConfig.batchSummaryUrl + "?bridgeEndpoint=true")
+                .toD(mockPaymentSchemaConfig.batchSummaryUrl + "?bridgeEndpoint=true&throwExceptionOnFailure=false")
                 .log(LoggingLevel.INFO, "Batch summary API response: \n\n ${body}");
 
         from("direct:batch-summary-response-handler")

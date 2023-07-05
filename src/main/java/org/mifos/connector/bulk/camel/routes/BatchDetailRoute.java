@@ -51,7 +51,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
-                .toD(mockPaymentSchemaConfig.batchDetailUrl + "bridgeEndpoint=true&throwExceptionOnFailure=false")
+                .toD(mockPaymentSchemaConfig.batchDetailUrl + "?bridgeEndpoint=true&throwExceptionOnFailure=false")
                 .log(LoggingLevel.DEBUG, "Batch detail API response: \n\n ${body}");
 
         from("direct:batch-detail-response-handler")
