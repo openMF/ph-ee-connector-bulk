@@ -71,14 +71,6 @@ public class BatchTransferWorker extends BaseWorker {
             Map<String, Object> variables = job.getVariablesAsMap();
             variables.put("waitTimer", waitTimer);
 
-//            Exchange exchange = new DefaultExchange(camelContext);
-//            exchange.setProperty(FILE_NAME, variables.get(FILE_NAME));
-//            exchange.setProperty(TENANT_ID, variables.get(TENANT_ID));
-//            exchange.setProperty(BATCH_ID, variables.get(BATCH_ID));
-//            exchange.setProperty(REQUEST_ID, variables.get(REQUEST_ID));
-//            exchange.setProperty(PURPOSE, variables.get(PURPOSE));
-            logger.info("Source batchId: " + variables.get(BATCH_ID));
-
             String paymentMode = (String) variables.get(PAYMENT_MODE);
             String filename = (String) variables.get(FILE_NAME);
 
@@ -87,15 +79,14 @@ public class BatchTransferWorker extends BaseWorker {
             List<Transaction> transactionList = parseCSVDataToList(csvData);
 
             if(!isPaymentModeValid(paymentMode)){
-//                String serverFileName = exchange.getProperty(FILE_NAME, String.class);
                 String serverFileName = (String) variables.get(FILE_NAME);
                 String resultFile = String.format("Result_%s", serverFileName);
                 uploadResultFileWithError(transactionList, resultFile);
                 variables.put(INIT_BATCH_TRANSFER_SUCCESS, false);
             }
             else{
-
-                String batchId = invokeBatchTransactionApi(filename, csvData);
+                String updatedCsvData = updateCsvDataPaymentMode(csvData);
+                String batchId = invokeBatchTransactionApi(filename, updatedCsvData);
                 if(!ObjectUtils.isEmpty(batchId)){
                     variables.put(INIT_BATCH_TRANSFER_SUCCESS, true);
                     logger.info("Source batchId: {}", variables.get(BATCH_ID));
@@ -105,6 +96,21 @@ public class BatchTransferWorker extends BaseWorker {
             client.newCompleteCommand(job.getKey()).variables(variables).send();
         });
 
+    }
+
+    private String updateCsvDataPaymentMode(String csvData) {
+
+        String[] lines = csvData.split("\n");
+        StringBuilder updatedCsvData = new StringBuilder();
+        updatedCsvData.append(lines[0]);
+        updatedCsvData.append("\n");
+
+        for(int i=1; i<lines.length; i++){
+            String updatedTransaction = lines[i].replaceAll("closedloop", "mojaloop");
+            updatedCsvData.append(updatedTransaction);
+            updatedCsvData.append("\n");
+        }
+        return updatedCsvData.toString();
     }
 
     private void uploadResultFileWithError(List<Transaction> transactionList, String resultFile) {
