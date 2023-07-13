@@ -1,0 +1,89 @@
+camel:
+  server-port: 5001
+  disable-ssl: false
+  springboot:
+    main-run-controller: true
+  dataformat:
+    json-jackson:
+      auto-discover-object-mapper: true
+
+server:
+  port: 8090
+
+zeebe:
+  client:
+    max-execution-threads: 100
+    number-of-workers: 8
+    evenly-allocated-max-jobs: "#{${zeebe.client.max-execution-threads} / ${zeebe.client.number-of-workers}}"
+    ttl: 30000
+    max-jobs-active: 2000
+  broker:
+    contactpoint: "127.0.0.1:26500"
+
+cloud:
+  aws:
+    bucket-name: ${AWS_BUCKET_NAME:paymenthub-ee-dev}
+    enabled: true
+    s3-base-url: "https://paymenthub-ee-dev.s3.us-east-2.amazonaws.com"
+    credentials:
+      access-key: ${AWS_ACCESS_KEY:access_key_from_aws}
+      secret-key: ${AWS_SECRET_KEY:secret_key_from_aws}
+    region:
+      static: us-east-2
+    stack:
+      auto: false
+
+
+config:
+  completion-threshold-check:
+    completion-threshold: 90
+    max-retry-count: 10
+    wait-timer: PT10S
+  date-format: "yyyy-MM-dd'T'hh:mm:ssXXX"
+  reconciliation:
+    enable: false
+
+dfspids: "DFSPID"
+
+
+operations-app:
+  contactpoint: "http://localhost:5060"
+  username: "mifos"
+  password: "password"
+  endpoints:
+    auth: "/oauth/token"
+    batch-summary: "/api/v1/batch"
+    batch-detail: "/api/v1/batch/detail"
+
+mock-payment-schema:
+  contactpoint: "http://localhost:8080"
+  endpoints:
+    batch-summary: "/mockapi/v1/batch/summary"
+    batch-detail: "/mockapi/v1/batch/detail"
+
+bulk-processor:
+  contactpoint: "http://localhost:5002"
+  endpoints:
+    batch-transaction: "/batchtransactions"
+
+payment-mode:
+  default: "MOJALOOP"
+  mappings:
+    - id: "GSMA"
+      type: "PAYMENT"
+      endpoint: "/channel/gsma/transfer"
+    - id: "MOJALOOP"
+      type: "PAYMENT"
+      endpoint: "/channel/transfer"
+    - id: "SLCB"
+      type: "BULK"
+      endpoint: "bulk_connector_{MODE}-{dfspid}"
+    - id: "CLOSEDLOOP"
+      type: "BULK"
+      endpoint: "bulk_connector_{MODE}-{dfspid}"
+
+application:
+  bucket-name: paymenthub-ee-dev
+
+tenant: "rhino"
+
