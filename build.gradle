@@ -5,19 +5,23 @@ plugins {
 
 group = 'org.mifos'
 version = '0.0.1-SNAPSHOT'
-sourceCompatibility = '1.8'
+sourceCompatibility = '14'
 
 repositories {
-	mavenCentral()
+	mavenLocal()
+	maven {
+		url = uri('https://repo.maven.apache.org/maven2')
+	}
 
 	maven {
-		url = uri('https://fynarfin.jfrog.io/artifactory/fyn-libs-snapshot-local/')
+		url = uri('https://jfrog.sandbox.fynarfin.io/artifactory/fyn-libs-snapshot')
 	}
 }
 
 dependencies {
 
 	implementation 'org.springframework.boot:spring-boot-starter-web:2.5.2'
+	implementation 'org.mifos:ph-ee-connector-common:1.7.1-rc.1'
 	implementation 'org.springframework.boot:spring-boot-starter:2.5.2'
 	implementation 'org.springframework:spring-web:5.3.19'
 	implementation 'org.apache.camel.springboot:camel-spring-boot-starter:3.4.0'
@@ -25,7 +29,6 @@ dependencies {
 	implementation 'org.apache.camel:camel-http:3.4.0'
 	implementation 'org.apache.camel:camel-jackson:3.4.0'
 	implementation 'org.json:json:20210307'
-	implementation 'org.mifos:ph-ee-connector-common:1.0.0-SNAPSHOT'
 	implementation 'com.amazonaws:aws-java-sdk:1.11.486'
 	implementation 'com.azure:azure-storage-blob:12.12.0'
 	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.12.0'
@@ -50,6 +53,7 @@ dependencies {
 	testImplementation('io.rest-assured:rest-assured:5.1.1') {
 		exclude group: 'org.codehaus.groovy'
 	}
+
 }
 
 tasks.withType(JavaCompile) {
