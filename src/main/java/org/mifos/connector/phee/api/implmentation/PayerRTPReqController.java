@@ -27,6 +27,7 @@ public class PayerRTPReqController implements PayerRtpReqApi {
             try {
                 billRTPReqService.payerRtpReq(tenantId, correlationId,callbackUrl, billerId ,payerRequestDTO);
 
+
             } catch (Exception e) {
                 ResponseDTO responseDTO = new ResponseDTO(FAILED_RESPONSE.getValue(), FAILED_RESPONSE.getValue(), correlationId);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseDTO);
