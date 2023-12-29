@@ -8,7 +8,7 @@ camel:
       auto-discover-object-mapper: true
 
 server:
-  port: 8090
+  port: 8080
 
 zeebe:
   client:
@@ -83,7 +83,12 @@ payment-mode:
       endpoint: "bulk_connector_{MODE}-{dfspid}"
 
 application:
-  bucket-name: paymenthub-ee-dev
+  bucket-name: paymenthub-ee
 
 tenant: "rhino"
+
+bill-pay:
+  contactpoint: "http://ph-ee-connector-bill-pay:8080"
+  endpoint:
+
 

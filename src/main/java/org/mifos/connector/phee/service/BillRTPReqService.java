@@ -1,5 +1,9 @@
 package org.mifos.connector.phee.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.json.JSONObject;
+import org.mifos.connector.common.channel.dto.TransactionChannelRequestDTO;
 import org.mifos.connector.phee.data.BillRTPReqDTO;
 import org.mifos.connector.phee.data.PayerRTPResponse;
 import org.mifos.connector.phee.data.PayerRequestDTO;
@@ -28,23 +32,29 @@ import static org.mifos.connector.phee.zeebe.ZeebeVariables.TENANT_ID;
 public class BillRTPReqService {
     @Autowired
     private ZeebeProcessStarter zeebeProcessStarter;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     String transactionId;
 
-    @Async("asyncExecutor")
     public String payerRtpReq(String tenantId, String correlationId, String callBackUrl,
-                             String billerId, PayerRequestDTO body) {
+                             String billerId, String requestBody) throws JsonProcessingException {
+        //PayerRequestDTO body = objectMapper.readValue(requestBody, PayerRequestDTO.class);
+        JSONObject json = new JSONObject(requestBody);
+        JSONObject billDetailsJson = json.getJSONObject("billDetails");
         Map<String, Object> extraVariables = new HashMap<>();
+        String billId = (String) billDetailsJson.get("billId");
+        String transactionId = (String) json.get("transactionId");
         extraVariables.put(TENANT_ID, tenantId);
         extraVariables.put(CLIENTCORRELATIONID, correlationId);
-        extraVariables.put("billId", body.getBillDetails().getBillId());
-        extraVariables.put("billerName", body.getBillDetails().getBillerName());
-        extraVariables.put("amount", body.getBillDetails().getAmount());
+        extraVariables.put("billId", billDetailsJson.get("billId"));
+        extraVariables.put("billerName", billDetailsJson.get("billerName"));
+        extraVariables.put("amount", billDetailsJson.get("amount"));
         extraVariables.put("billerId", billerId);
-        extraVariables.put("BillRTPReqBody", body);
+        extraVariables.put("BillRTPReqBody", requestBody);
         extraVariables.put("rtpStatus", "00");
         extraVariables.put("rejectReason", "");
-        extraVariables.put("transactionId", body.getTransactionId());
+        extraVariables.put("transactionId", json.get("transactionId"));
 
         //call payer FI
         // here adding a mock response of happy flow from payer FI
@@ -55,7 +65,7 @@ public class BillRTPReqService {
         headers.set("X-Client-Correlation-ID", correlationId);
         headers.set("X-Biller-Id", billerId);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        PayerRTPResponse payerRTPResponse =  createMockBody(body);
+        PayerRTPResponse payerRTPResponse =  createMockBody(billId, transactionId);
 
 
         HttpEntity<PayerRTPResponse> request = new HttpEntity<>(payerRTPResponse, headers);
@@ -72,10 +82,10 @@ public class BillRTPReqService {
 
         return transactionId;
     }
-    public PayerRTPResponse createMockBody(PayerRequestDTO body){
+    public PayerRTPResponse createMockBody(String billId, String transactionId){
         PayerRTPResponse payerRTPResponse =  new PayerRTPResponse();
-        payerRTPResponse.setBillId(body.getBillDetails().getBillId());
-        payerRTPResponse.setTxnId(body.getTransactionId());
+        payerRTPResponse.setBillId(billId);
+        payerRTPResponse.setTxnId(transactionId);
         payerRTPResponse.setRtpStatus("00");
         payerRTPResponse.setRejectReason("");
         return payerRTPResponse;
