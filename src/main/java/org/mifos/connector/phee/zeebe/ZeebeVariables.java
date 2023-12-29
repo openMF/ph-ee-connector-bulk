@@ -110,6 +110,7 @@ public class ZeebeVariables {
 
     public static final String CLIENTCORRELATIONID = "X-CorrelationID";
 
+    public static final String RTP_STATUS = "rtpStatus";
 
 
 }
