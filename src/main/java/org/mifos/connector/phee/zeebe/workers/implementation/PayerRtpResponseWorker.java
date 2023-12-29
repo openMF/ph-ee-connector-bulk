@@ -1,5 +1,10 @@
 package org.mifos.connector.phee.zeebe.workers.implementation;
 
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.mifos.connector.phee.data.PayerRTPResponse;
 import org.mifos.connector.phee.data.ResponseDTO;
 import org.mifos.connector.phee.zeebe.workers.BaseWorker;
@@ -9,6 +14,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -26,6 +32,12 @@ public class PayerRtpResponseWorker extends BaseWorker {
             variables.put("billAccepted", true);
             variables.put(RTP_STATUS ,"00");
             RestTemplate restTemplate = new RestTemplate();
+            HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
+            CloseableHttpClient httpClient = HttpClients.custom()
+                    .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build())
+                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                    .build();
+            restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
             String billId = (String) variables.get("billId");
             String transactionId = (String) variables.get("transactionId");
             String callbackUrl = (String) variables.get("payerCallbackUrl");
