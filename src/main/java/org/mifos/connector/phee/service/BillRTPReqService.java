@@ -39,7 +39,6 @@ public class BillRTPReqService {
 
     public String payerRtpReq(String tenantId, String correlationId, String callBackUrl,
                              String billerId, String requestBody) throws JsonProcessingException {
-
         return transactionId;
     }
 

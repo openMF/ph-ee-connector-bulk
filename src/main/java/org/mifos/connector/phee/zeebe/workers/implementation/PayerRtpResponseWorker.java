@@ -20,6 +20,9 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.HEADER_BILLER_ID;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.HEADER_CLIENTCORRELATIONID;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.HEADER_TENANT;
 import static org.mifos.connector.phee.zeebe.ZeebeVariables.RTP_STATUS;
 
 @Component
@@ -44,9 +47,9 @@ public class PayerRtpResponseWorker extends BaseWorker {
             String tenantId = (String) variables.get("payerTenantId");
 
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Platform-TenantId", tenantId);
-            headers.set("X-Client-Correlation-ID", (String) variables.get("X-CorrelationID"));
-            headers.set("X-Biller-Id", (String) variables.get("billerId"));
+            headers.set(HEADER_TENANT, tenantId);
+            headers.set(HEADER_CLIENTCORRELATIONID, (String) variables.get("X-CorrelationID"));
+            headers.set(HEADER_BILLER_ID, (String) variables.get("billerId"));
             headers.setContentType(MediaType.APPLICATION_JSON);
             PayerRTPResponse payerRTPResponse = createMockBody(billId, transactionId);
 

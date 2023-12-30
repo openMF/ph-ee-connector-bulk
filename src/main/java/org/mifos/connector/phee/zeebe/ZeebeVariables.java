@@ -111,6 +111,9 @@ public class ZeebeVariables {
     public static final String CLIENTCORRELATIONID = "X-CorrelationID";
 
     public static final String RTP_STATUS = "rtpStatus";
+    public static final String HEADER_TENANT = "X-Platform-TenantId";
+    public static final String HEADER_BILLER_ID = "X-Biller-Id";
+    public static final String HEADER_CLIENTCORRELATIONID = "X-Client-Correlation-ID";
 
 
 }
