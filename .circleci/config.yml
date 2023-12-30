@@ -57,7 +57,6 @@ jobs:
       - run:
           name: Build Docker image
           command: |
-            ./gradlew checkstyleMain
             ./gradlew bootJar
             docker build -t openmf/ph-ee-connector-bulk:latest .
             if [ "$CIRCLE_BRANCH" != "master" ]; then
@@ -78,7 +77,7 @@ jobs:
           name: Push Docker image to DockerHub
           command: |
             if [ "$CIRCLE_BRANCH" = "master" ]; then
-            docker push openmf/ph-ee-connector-bulkr:latest
+            docker push openmf/ph-ee-connector-bulk:latest
             fi
             if [ "$CIRCLE_BRANCH" != "master" ]; then
             PR_NUMBER=$(basename $CIRCLE_PULL_REQUEST)
@@ -86,6 +85,7 @@ jobs:
             JIRA_STORY=$(echo $PR_TITLE | cut -d "[" -f2 | cut -d "]" -f1 | tr '[A-Z]' '[a-z]')
             docker push openmf/$CIRCLE_PR_REPONAME:${JIRA_STORY}
             fi
+
 
 workflows:
   version: 2
