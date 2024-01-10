@@ -6,6 +6,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
+import org.apache.camel.Exchange;
+import org.apache.camel.support.DefaultExchange;
+import org.apache.http.client.HttpClient;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.mifos.connector.common.util.JsonWebSignature;
 import org.mifos.connector.phee.config.PaymentModeConfiguration;
 import org.mifos.connector.phee.config.PaymentModeMapping;
 import org.mifos.connector.phee.file.FileTransferService;
@@ -13,11 +22,12 @@ import org.mifos.connector.phee.schema.Transaction;
 import org.mifos.connector.phee.schema.TransactionResult;
 import org.mifos.connector.phee.utils.Utils;
 import org.mifos.connector.phee.zeebe.workers.BaseWorker;
-import org.mifos.connector.phee.zeebe.workers.Worker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -26,13 +36,30 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.InvalidKeyException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.*;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.BATCH_ID;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.FILE_NAME;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.INIT_BATCH_TRANSFER_SUCCESS;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.PAYMENT_MODE;
+import static org.mifos.connector.phee.zeebe.workers.Worker.INIT_BATCH_TRANSFER;
+
 
 @Component
 public class BatchTransferWorker extends BaseWorker {
@@ -53,6 +80,9 @@ public class BatchTransferWorker extends BaseWorker {
     @Value("${bulk-processor.endpoints.batch-transaction}")
     private String batchTransactionEndpoint;
 
+    @Value("${json_web_signature.privateKey}")
+    private String privateKeyString;
+
     @Autowired
     private PaymentModeConfiguration paymentModeConfiguration;
 
@@ -64,17 +94,21 @@ public class BatchTransferWorker extends BaseWorker {
 
     @Override
     public void setup() {
-
-        newWorker(Worker.INIT_BATCH_TRANSFER, (client, job) ->{
+        logger.info("## generating " + INIT_BATCH_TRANSFER + "zeebe worker");
+        newWorker(INIT_BATCH_TRANSFER, (client, job) ->{
             Map<String, Object> variables = job.getVariablesAsMap();
             variables.put("waitTimer", waitTimer);
 
             String paymentMode = (String) variables.get(PAYMENT_MODE);
-            String filename = (String) variables.get(FILE_NAME);
+            String fileName = (String) variables.get(FILE_NAME);
 
             byte[] bytes = fileTransferService.downloadFileAsStream((String) variables.get(FILE_NAME), bucketName);
             String csvData = new String(bytes);
             List<Transaction> transactionList = parseCSVDataToList(csvData);
+            String rootDirectory = System.getProperty("user.dir");
+
+            // Create the file path using the root directory and file name
+            String filePath = rootDirectory + File.separator + fileName;
 
             if(!isPaymentModeValid(paymentMode)){
                 String serverFileName = (String) variables.get(FILE_NAME);
@@ -83,8 +117,10 @@ public class BatchTransferWorker extends BaseWorker {
                 variables.put(INIT_BATCH_TRANSFER_SUCCESS, false);
             }
             else{
-                String updatedCsvData = updateCsvDataPaymentMode(csvData);
-                String batchId = invokeBatchTransactionApi(filename, updatedCsvData);
+                String updatedCsvData = updateCsvDataPaymentMode(csvData, filePath);
+                String clientCorrelationId = String.valueOf(UUID.randomUUID());
+                //String batchId = invokeBatchTransactionApi(fileName, updatedCsvData, filePath, clientCorrelationId);
+                String batchId = "!2355667";
                 if(!ObjectUtils.isEmpty(batchId)){
                     variables.put(INIT_BATCH_TRANSFER_SUCCESS, true);
                     logger.info("Source batchId: {}", variables.get(BATCH_ID));
@@ -96,7 +132,7 @@ public class BatchTransferWorker extends BaseWorker {
 
     }
 
-    private String updateCsvDataPaymentMode(String csvData) {
+    private String updateCsvDataPaymentMode(String csvData, String filePath) {
 
         String[] lines = csvData.split("\n");
         StringBuilder updatedCsvData = new StringBuilder();
@@ -106,9 +142,24 @@ public class BatchTransferWorker extends BaseWorker {
         for(int i=1; i<lines.length; i++){
             String updatedTransaction = lines[i].replaceAll("closedloop", "mojaloop");
             updatedCsvData.append(updatedTransaction);
-            updatedCsvData.append("\n");
+            if(i!= lines.length-1) {
+                updatedCsvData.append("\n");
+            }
         }
+
+        try {
+            // Write the updated CSV data to a file
+            writeCsvToFile(String.valueOf(updatedCsvData), filePath);
+        } catch (IOException e) {
+            logger.error(e.getMessage());
+        }
+
         return updatedCsvData.toString();
+    }
+
+    private void writeCsvToFile(String csvData, String filePath) throws IOException {
+        Path path = Paths.get(filePath);
+        Files.write(path, csvData.getBytes());
     }
 
     private void uploadResultFileWithError(List<Transaction> transactionList, String resultFile) {
@@ -127,14 +178,18 @@ public class BatchTransferWorker extends BaseWorker {
         return mapping != null;
     }
 
-    private String invokeBatchTransactionApi(String filename, String csvData){
+    private String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId) throws NoSuchPaddingException, IllegalBlockSizeException, IOException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException, InvalidKeyException, KeyStoreException, KeyManagementException {
+
+        String signature = generateSignature(clientCorrelationId, tenant, csvData, true, filePath);
+
         RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<String> response = null;
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.add("Purpose", "test purpose");
-        headers.add("filename", filename);
-        headers.add("Platform-TenantId", tenant);
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build())
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .build();
+        restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
+
+        //ResponseEntity<String> response = null;
 
         ContentDisposition contentDisposition = ContentDisposition
                 .builder("form-data")
@@ -145,14 +200,14 @@ public class BatchTransferWorker extends BaseWorker {
         MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
         fileMap.add(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
         HttpEntity<byte[]> fileEntity = new HttpEntity<>(csvData.getBytes(), fileMap);
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("file", fileEntity);
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        //MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        //body.add("file", fileEntity);
+        // HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         String batchTransactionUrl = bulkProcessorContactPoint + batchTransactionEndpoint;
         String url = UriComponentsBuilder.fromHttpUrl(batchTransactionUrl)
                 .queryParam("type", "csv").toUriString();
-        try {
+/*        try {
             response = restTemplate.exchange(
                     url,
                     HttpMethod.POST,
@@ -161,7 +216,33 @@ public class BatchTransferWorker extends BaseWorker {
             logger.debug(response.toString());
         } catch (HttpClientErrorException e) {
             e.printStackTrace();
-        }
+        }*/
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        headers.set("purpose", "test payment");
+        headers.set("filename", filename);
+        headers.set("X-CorrelationID", clientCorrelationId);
+        headers.set("Platform-TenantId", tenant);
+        headers.set("X-SIGNATURE", signature);
+        headers.set("Type", "csv");
+        // headers.set("X-Registering-Institution-ID", "SocialWelfare");
+
+        // Set the file data
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("data", Files.readString(Paths.get(filePath)));
+
+        // Create the request entity
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+
+
+        // Make the HTTP POST request
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                requestEntity,
+                String.class);
+
 
         String batchTransactionResponse = response != null ? response.getBody() : null;
         ObjectMapper objectMapper = new ObjectMapper();
@@ -243,5 +324,20 @@ public class BatchTransferWorker extends BaseWorker {
             writer.write(object);
         }
     }
+    protected String generateSignature(String clientCorrelationId, String tenant, String filename, boolean isDataAFile, String filePath) throws IOException,
+            NoSuchPaddingException, IllegalBlockSizeException, NoSuchAlgorithmException,
+            BadPaddingException, InvalidKeySpecException, InvalidKeyException {
+
+
+        JsonWebSignature jsonWebSignature = new JsonWebSignature.JsonWebSignatureBuilder()
+                .setClientCorrelationId(clientCorrelationId)
+                .setTenantId(tenant)
+                .setIsDataAsFile(isDataAFile)
+                .setData(filePath)
+                .build();
+
+        return jsonWebSignature.getSignature(privateKeyString);
+    }
+
 
 }
