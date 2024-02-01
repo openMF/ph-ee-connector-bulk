@@ -3,7 +3,6 @@ package org.mifos.connector.phee.camel.routes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
-import org.apache.camel.model.dataformat.JsonLibrary;
 import org.mifos.connector.phee.config.MockPaymentSchemaConfig;
 import org.mifos.connector.phee.schema.BatchDetailResponse;
 import org.mifos.connector.phee.schema.Transaction;
@@ -181,7 +180,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
         for (Transaction transaction : transactionList) {
             TransactionResult transactionResult = Utils.mapToResultDTO(transaction);
             transactionResult.setPaymentMode("CLOSEDLOOP");
-            transactionResult.setBatchId(batchId);
+            transactionResult.setBatchId(transaction.getBatchId());
             String status = requestIdStatusMap.get(transaction.getRequestId());
             transactionResult.setStatus(status);
             transactionResultList.add(transactionResult);

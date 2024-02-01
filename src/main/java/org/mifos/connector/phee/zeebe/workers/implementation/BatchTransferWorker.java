@@ -6,12 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import org.apache.camel.Exchange;
-import org.apache.camel.support.DefaultExchange;
-import org.apache.http.client.HttpClient;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.mifos.connector.common.util.JsonWebSignature;
@@ -25,14 +21,12 @@ import org.mifos.connector.phee.zeebe.workers.BaseWorker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.ObjectUtils;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -54,10 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.BATCH_ID;
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.FILE_NAME;
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.INIT_BATCH_TRANSFER_SUCCESS;
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.PAYMENT_MODE;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.*;
 import static org.mifos.connector.phee.zeebe.workers.Worker.INIT_BATCH_TRANSFER;
 
 
@@ -97,6 +88,7 @@ public class BatchTransferWorker extends BaseWorker {
         logger.info("## generating " + INIT_BATCH_TRANSFER + "zeebe worker");
         newWorker(INIT_BATCH_TRANSFER, (client, job) ->{
             Map<String, Object> variables = job.getVariablesAsMap();
+            String debulkingDfspId = variables.get(DEBULKINGDFSPID).toString();
             variables.put("waitTimer", waitTimer);
 
             String paymentMode = (String) variables.get(PAYMENT_MODE);
@@ -119,8 +111,8 @@ public class BatchTransferWorker extends BaseWorker {
             else{
                 String updatedCsvData = updateCsvDataPaymentMode(csvData, filePath);
                 String clientCorrelationId = String.valueOf(UUID.randomUUID());
-                //String batchId = invokeBatchTransactionApi(fileName, updatedCsvData, filePath, clientCorrelationId);
-                String batchId = "!2355667";
+                String batchId = invokeBatchTransactionApi(fileName, updatedCsvData, filePath, clientCorrelationId, debulkingDfspId);
+                logger.info("invokeBatchTransactionApi: {}", batchId);
                 if(!ObjectUtils.isEmpty(batchId)){
                     variables.put(INIT_BATCH_TRANSFER_SUCCESS, true);
                     logger.info("Source batchId: {}", variables.get(BATCH_ID));
@@ -178,7 +170,7 @@ public class BatchTransferWorker extends BaseWorker {
         return mapping != null;
     }
 
-    private String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId) throws NoSuchPaddingException, IllegalBlockSizeException, IOException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException, InvalidKeyException, KeyStoreException, KeyManagementException {
+    private String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId, String tenant) throws NoSuchPaddingException, IllegalBlockSizeException, IOException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException, InvalidKeyException, KeyStoreException, KeyManagementException {
 
         String signature = generateSignature(clientCorrelationId, tenant, csvData, true, filePath);
 
@@ -293,6 +285,7 @@ public class BatchTransferWorker extends BaseWorker {
             transaction.setAmount(transactionFields[7]);
             transaction.setCurrency(transactionFields[8]);
             transaction.setNote(transactionFields[9]);
+            transaction.setBatchId(transactionFields[14]);
             transactionList.add(transaction);
         }
         return transactionList;
