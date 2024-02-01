@@ -11,7 +11,20 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.*;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.BATCH_ID;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.BATCH_SUMMARY_SUCCESS;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.COMPLETED_AMOUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.COMPLETED_TRANSACTION;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.COMPLETION_RATE;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ERROR_CODE;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ERROR_DESCRIPTION;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.FAILED_AMOUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.FAILED_TRANSACTION;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ONGOING_AMOUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ONGOING_TRANSACTION;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.TOTAL_AMOUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.TOTAL_TRANSACTION;
+
 
 @Component
 public class BatchSummaryRoute extends BaseRouteBuilder {
@@ -36,13 +49,20 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
 
 
         getBaseExternalApiRequestRouteDefinition("batch-summary-api-call", HttpRequestMethod.GET)
-                .setHeader(Exchange.REST_HTTP_QUERY, simple("batchId=${exchangeProperty." + BATCH_ID + "}"))
+                .setHeader(Exchange.HTTP_METHOD, constant("GET"))
+                .setHeader(Exchange.HTTP_PATH, simple("/batches/${exchangeProperty." + BATCH_ID + "}/summary"))
                 .setHeader("Platform-TenantId", simple(tenant))
                 .process(exchange -> {
                     logger.info(exchange.getIn().getHeaders().toString());
                 })
-                .toD(mockPaymentSchemaConfig.batchSummaryUrl + "?bridgeEndpoint=true&throwExceptionOnFailure=false")
+                .toD("direct:callBatchSummaryEndpoint") // Use a direct endpoint to call the method
                 .log(LoggingLevel.INFO, "Batch summary API response: \n\n ${body}");
+
+// Define a route to call the Spring method
+        from("direct:callBatchSummaryEndpoint")
+                .to(mockPaymentSchemaConfig.mockPaymentSchemaContactPoint+"/batches/${exchangeProperty." + BATCH_ID + "}/summary")
+                .log(LoggingLevel.INFO, "Batch summary API response: \n\n ${body}");
+
 
         from("direct:batch-summary-response-handler")
                 .id("direct:batch-summary-response-handler")
