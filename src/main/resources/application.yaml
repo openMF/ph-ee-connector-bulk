@@ -47,7 +47,7 @@ dfspids: "DFSPID"
 
 
 operations-app:
-  contactpoint: "http://localhost:5060"
+  contactpoint: "https://ops-bk.sandbox.mifos.io"
   username: "mifos"
   password: "password"
   endpoints:
@@ -56,13 +56,13 @@ operations-app:
     batch-detail: "/api/v1/batch/detail"
 
 mock-payment-schema:
-  contactpoint: "http://localhost:8001"
+  contactpoint: "http://ph-ee-connector-mock-payment-schema:8080"
   endpoints:
     batch-summary: "/mockapi/v1/batch/summary"
     batch-detail: "/mockapi/v1/batch/detail"
 
 bulk-processor:
-  contactpoint: "https://localhost:8443"
+  contactpoint: "https://ph-ee-processor-bulk:8443"
   endpoints:
     batch-transaction: "/batchtransactions"
 
