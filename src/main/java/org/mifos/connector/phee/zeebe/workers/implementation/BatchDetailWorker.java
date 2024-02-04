@@ -48,7 +48,7 @@ public class BatchDetailWorker extends BaseWorker {
 
     @Override
     public void setup() {
-        logger.info("## generating " + BATCH_DETAILS + "zeebe worker");
+        logger.info("## generating {} zeebe worker", BATCH_DETAILS );
         newWorker(BATCH_DETAILS, (client, job) -> {
             logger.info("Job '{}' started from process '{}' with key {}", job.getType(), job.getBpmnProcessId(), job.getKey());
             Map<String, Object> variables = job.getVariablesAsMap();
@@ -59,7 +59,6 @@ public class BatchDetailWorker extends BaseWorker {
             int completedTransactionCount = (int) variables.getOrDefault(COMPLETED_TRANSACTION_COUNT, 0);
             int failedTransactionCount = (int) variables.getOrDefault(FAILED_TRANSACTION_COUNT, 0);
             int ongoingTransactionCount = (int) variables.getOrDefault(ONGOING_TRANSACTION_COUNT, 0);
-            //BatchDetailResponse batchDetailResponse =  callApi(variables.get(BATCH_ID).toString(), pageNumber, pageSize, variables.get(TENANT_ID).toString());
 
             Exchange exchange = new DefaultExchange(camelContext);
             exchange.setProperty(BATCH_ID, variables.get(BATCH_ID));
@@ -75,7 +74,6 @@ public class BatchDetailWorker extends BaseWorker {
             exchange.setProperty(REQUEST_ID_STATUS_MAP, variables.getOrDefault(REQUEST_ID_STATUS_MAP, new HashMap<>()));
 
             sendToCamelRoute(RouteId.BATCH_DETAIL, exchange);
-            //BatchDetailResponse batchDetailResponse = callApi((String) variables.get(BATCH_ID), 1, 10, (String) variables.get(TENANT_ID));
 
             boolean isReconciliationSuccess = exchange.getProperty(BATCH_DETAIL_SUCCESS, Boolean.class);
 
@@ -111,10 +109,11 @@ public class BatchDetailWorker extends BaseWorker {
         headers.set("Platform-TenantId", tenant);
 
         // Construct URL with query parameters
-        String apiUrl = mockPaymentSchemaConfig.batchDetailUrl + "?"
-                + BATCH_ID + "=" + batchId + "&"
-                + PAGE_NO + "=" + pageNo + "&"
-                + PAGE_SIZE + "=" + pageSize;
+        String apiUrl = String.format("%s?%s=%s&%s=%s&%s=%s",
+                mockPaymentSchemaConfig.batchDetailUrl,
+                BATCH_ID, batchId,
+                PAGE_NO, pageNo,
+                PAGE_SIZE, pageSize);
 
         // Construct request entity with headers
         HttpEntity<String> requestEntity = new HttpEntity<>(headers);
@@ -131,7 +130,7 @@ public class BatchDetailWorker extends BaseWorker {
             batchDetailResponse = objectMapper.readValue(response.getBody(), BatchDetailResponse.class);
 
             // Log response
-            logger.info("Batch detail API response: \n\n" + response.getBody());
+            logger.debug("Batch detail API response: {}", response.getBody());
         } catch (Exception e) {
             // Handle exceptions
             logger.warn("Exception occurred: " + e.getMessage());
@@ -146,6 +145,7 @@ public class BatchDetailWorker extends BaseWorker {
             uploadResultFile();
         } else {
             // Handle API call failure
+            logger.info("CallBatchDetailApi response is null");
         }
     }
 

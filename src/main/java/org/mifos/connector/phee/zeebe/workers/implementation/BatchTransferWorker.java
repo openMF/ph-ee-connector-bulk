@@ -169,46 +169,32 @@ public class BatchTransferWorker extends BaseWorker {
         PaymentModeMapping mapping = paymentModeConfiguration.getByMode(paymentMode);
         return mapping != null;
     }
-
-    private String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId, String tenant) throws NoSuchPaddingException, IllegalBlockSizeException, IOException, NoSuchAlgorithmException, BadPaddingException, InvalidKeySpecException, InvalidKeyException, KeyStoreException, KeyManagementException {
-
+    public String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId, String tenant) throws Exception {
         String signature = generateSignature(clientCorrelationId, tenant, csvData, true, filePath);
-
-        RestTemplate restTemplate = new RestTemplate();
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build())
-                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                .build();
-        restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
-
-        //ResponseEntity<String> response = null;
-
-        ContentDisposition contentDisposition = ContentDisposition
-                .builder("form-data")
-                .name("file")
-                .filename(filename)
-                .build();
-
-        MultiValueMap<String, String> fileMap = new LinkedMultiValueMap<>();
-        fileMap.add(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
-        HttpEntity<byte[]> fileEntity = new HttpEntity<>(csvData.getBytes(), fileMap);
-        //MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        //body.add("file", fileEntity);
-        // HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-
         String batchTransactionUrl = bulkProcessorContactPoint + batchTransactionEndpoint;
         String url = UriComponentsBuilder.fromHttpUrl(batchTransactionUrl)
                 .queryParam("type", "csv").toUriString();
-/*        try {
-            response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    requestEntity,
-                    String.class);
-            logger.debug(response.toString());
-        } catch (HttpClientErrorException e) {
-            e.printStackTrace();
-        }*/
+
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = createHttpEntity(filename, csvData, filePath, clientCorrelationId, tenant, signature);
+        return executeBatchTransactionRequest(url, requestEntity);
+    }
+
+
+    private RestTemplate createRestTemplate() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+        RestTemplate restTemplate = new RestTemplate();
+        CloseableHttpClient httpClient = createHttpClient();
+        restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
+        return restTemplate;
+    }
+
+    private CloseableHttpClient createHttpClient() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+        return HttpClients.custom()
+                .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build())
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .build();
+    }
+
+    private HttpEntity<MultiValueMap<String, Object>> createHttpEntity(String filename, String csvData, String filePath, String clientCorrelationId, String tenant, String signature) throws IOException {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.set("purpose", "test payment");
@@ -217,39 +203,25 @@ public class BatchTransferWorker extends BaseWorker {
         headers.set("Platform-TenantId", tenant);
         headers.set("X-SIGNATURE", signature);
         headers.set("Type", "csv");
-        // headers.set("X-Registering-Institution-ID", "SocialWelfare");
 
-        // Set the file data
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("data", Files.readString(Paths.get(filePath)));
 
-        // Create the request entity
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        return new HttpEntity<>(body, headers);
+    }
 
-
-
-        // Make the HTTP POST request
-        ResponseEntity<String> response = restTemplate.exchange(
-                url,
-                HttpMethod.POST,
-                requestEntity,
-                String.class);
-
+    private String executeBatchTransactionRequest(String url, HttpEntity<MultiValueMap<String, Object>> requestEntity) throws JsonProcessingException, NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+        RestTemplate restTemplate = createRestTemplate();
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
         String batchTransactionResponse = response != null ? response.getBody() : null;
         ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            JsonNode jsonNode = objectMapper.readTree(batchTransactionResponse);
-            return jsonNode.get("PollingPath").asText().split("/")[3];
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        JsonNode jsonNode = objectMapper.readTree(batchTransactionResponse);
+        return jsonNode.get("PollingPath").asText().split("/")[3];
     }
 
     public String getListAsCsvString(List<Transaction> list){
-
         StringBuilder stringBuilder = new StringBuilder();
-
         stringBuilder.append("id,request_id,payment_mode,payer_identifier_type,payer_identifier,payee_identifier_type,payee_identifier,amount,currency,note\n");
         for(Transaction transaction : list){
             stringBuilder.append(transaction.getId()).append(",")
