@@ -85,6 +85,7 @@ public class Utils {
         transactionResult.setAmount(transaction.getAmount());
         transactionResult.setCurrency(transaction.getCurrency());
         transactionResult.setNote(transaction.getNote());
+        transactionResult.setBatchId(transaction.getBatchId());
         transactionResult.setPayeeIdentifierType(transaction.getPayeeIdentifierType());
         if (transaction.getAccountNumber() != null) {
             transactionResult.setPayeeIdentifier(transaction.getAccountNumber());

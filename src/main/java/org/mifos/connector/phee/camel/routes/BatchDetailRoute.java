@@ -1,10 +1,14 @@
 package org.mifos.connector.phee.camel.routes;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
-import org.apache.camel.model.dataformat.JsonLibrary;
 import org.mifos.connector.phee.config.MockPaymentSchemaConfig;
-import org.mifos.connector.phee.schema.*;
+import org.mifos.connector.phee.schema.BatchDetailResponse;
+import org.mifos.connector.phee.schema.Transaction;
+import org.mifos.connector.phee.schema.TransactionResult;
+import org.mifos.connector.phee.schema.Transfer;
+import org.mifos.connector.phee.schema.TransferStatus;
 import org.mifos.connector.phee.utils.Utils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +19,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.mifos.connector.phee.zeebe.ZeebeVariables.*;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.BATCH_DETAIL_SUCCESS;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.BATCH_ID;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.COMPLETED_TRANSACTION_COUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.CURRENT_TRANSACTION_COUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ERROR_CODE;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ERROR_DESCRIPTION;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.FAILED_TRANSACTION_COUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.FILE_NAME;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.LOCAL_FILE_PATH;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.ONGOING_TRANSACTION_COUNT;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.OVERRIDE_HEADER;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.PAGE_NO;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.REQUEST_ID_STATUS_MAP;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.RESULT_FILE;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.RESULT_TRANSACTION_LIST;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.TOTAL_TRANSACTION;
+import static org.mifos.connector.phee.zeebe.ZeebeVariables.TRANSACTION_LIST;
+
 
 @Component
 public class BatchDetailRoute extends BaseRouteBuilder {
@@ -28,6 +49,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
 
     @Autowired
     public MockPaymentSchemaConfig mockPaymentSchemaConfig;
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public void configure() throws Exception {
@@ -35,24 +57,18 @@ public class BatchDetailRoute extends BaseRouteBuilder {
         from(RouteId.BATCH_DETAIL.getValue())
                 .id(RouteId.BATCH_DETAIL.getValue())
                 .log("Starting route " + RouteId.BATCH_DETAIL.name())
-               // .to("direct:batch-detail-api-call")
+                .to("direct:batch-detail-api-call")
                 .to("direct:batch-detail-response-handler");
 
-        getBaseExternalApiRequestRouteDefinition("batch-detail-api-call", HttpRequestMethod.GET)
-                .setHeader(
-                        Exchange.REST_HTTP_QUERY,
-                        simple(
-                                BATCH_ID + "=${exchangeProperty." + BATCH_ID + "}&" +
-                                        PAGE_NO + "=${exchangeProperty." + PAGE_NO + "}&" +
-                                        PAGE_SIZE + "=${exchangeProperty." + PAGE_SIZE + "}"
-                        )
-                )
-                .setHeader("Platform-TenantId", simple(tenant))
-                .process(exchange -> {
-                    logger.info(exchange.getIn().getHeaders().toString());
-                })
-                .toD(mockPaymentSchemaConfig.batchDetailUrl + "?bridgeEndpoint=true&throwExceptionOnFailure=false")
-                .log(LoggingLevel.DEBUG, "Batch detail API response: \n\n ${body}");
+        from("direct:batch-detail-api-call")
+                .routeId("direct:batch-detail-api-call")
+                .setHeader("CamelHttpMethod", constant("GET"))
+                .setHeader("Accept", constant("application/json"))
+                .toD(mockPaymentSchemaConfig.mockPaymentSchemaContactPoint+"/batches/"+ "${exchangeProperty.batchId}"+"/detail"+ "?" + "pageNo" + "=${exchangeProperty.pageNo}&"  + "pageSize"
+                        + "=${exchangeProperty.pageSize}"  )
+                .log("API Response: ${body}")
+                .setProperty("apiResponse", body()) ; // Log the API response, you can modify this according to your needs
+
 
         from("direct:batch-detail-response-handler")
                 .id("direct:batch-detail-response-handler")
@@ -60,9 +76,10 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                 .choice()
                 .when(header("CamelHttpResponseCode").isEqualTo("200"))
                 .log(LoggingLevel.INFO, "Batch detail request successful")
-                .unmarshal().json(JsonLibrary.Jackson, BatchDetailResponse.class)
                 .process(exchange -> {
-                    BatchDetailResponse batchDetailResponse = exchange.getIn().getBody(BatchDetailResponse.class);
+                    String apiResponse = exchange.getProperty("apiResponse", String.class);
+                    logger.info(apiResponse);
+                    BatchDetailResponse batchDetailResponse = objectMapper.readValue(apiResponse, BatchDetailResponse.class);
                     logger.info(batchDetailResponse.toString());
 
                     int pageNo = Integer.parseInt(exchange.getProperty(PAGE_NO, String.class));
@@ -118,7 +135,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                     exchange.setProperty(ONGOING_TRANSACTION_COUNT, ongoingTransferCount);
                     exchange.setProperty(REQUEST_ID_STATUS_MAP, requestIdStatusMap);
 
-                    if(currentTransferCount>=totalTransferCount){
+                    if(currentTransferCount<=totalTransferCount){
                         exchange.setProperty(BATCH_DETAIL_SUCCESS, true);
                     }
                     else {
@@ -163,7 +180,7 @@ public class BatchDetailRoute extends BaseRouteBuilder {
         for (Transaction transaction : transactionList) {
             TransactionResult transactionResult = Utils.mapToResultDTO(transaction);
             transactionResult.setPaymentMode("CLOSEDLOOP");
-            transactionResult.setBatchId(batchId);
+            transactionResult.setBatchId(transaction.getBatchId());
             String status = requestIdStatusMap.get(transaction.getRequestId());
             transactionResult.setStatus(status);
             transactionResultList.add(transactionResult);
