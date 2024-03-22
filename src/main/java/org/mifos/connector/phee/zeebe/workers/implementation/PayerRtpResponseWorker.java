@@ -33,7 +33,7 @@ public class PayerRtpResponseWorker extends BaseWorker {
         newWorker(Worker.PAYER_RTP_RESPONSE, (client, job) -> {
             Map<String, Object> variables = job.getVariablesAsMap();
             variables.put("billAccepted", true);
-            variables.put("state", "IN PROGRESS");
+            variables.put("state", "IN_PROGRESS");
             variables.put(RTP_STATUS ,"00");
             RestTemplate restTemplate = new RestTemplate();
             HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
