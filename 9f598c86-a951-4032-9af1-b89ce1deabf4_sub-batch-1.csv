@@ -1,0 +1,6 @@
+id,request_id,payment_mode,payer_identifier_type,payer_identifier,payee_identifier_type,payee_identifier,amount,currency,note,program_shortcode,cycle,payee_dfsp_id,batch_id,account_number
+0,"g2e22fe3-9740-4fba-97b6-78f43bfa7f2f",closedloop,accountNumber,003001003879112168,accountNumber,400173110196,150,USD,,,,,"3da4d1f1-48b2-401a-b61f-1279017cf8f4",
+1,"71aa3ea4-e6f6-4880-877f-39f6ac4d052e",closedloop,accountNumber,003001003879112168,accountNumber,400174120160,222,USD,,,,,"3da4d1f1-48b2-401a-b61f-1279017cf8f4",
+2,"f4e22fe3-9740-4fba-97b6-78f43bfa7f0f",closedloop,accountNumber,003001003879112168,accountNumber,400173110195,140,USD,,,,,"3da4d1f1-48b2-401a-b61f-1279017cf8f4",
+3,"72aa3ea4-e6f6-4880-877f-39f6ac4d052e",closedloop,accountNumber,003001003879112168,accountNumber,400174120160,220,USD,,,,,"3da4d1f1-48b2-401a-b61f-1279017cf8f4",
+4,"77za3ea4-e6f6-4880-877f-39f6ac4d052e",closedloop,accountNumber,003001003879112168,accountNumber,400174120160,122,USD,,,,,"3da4d1f1-48b2-401a-b61f-1279017cf8f4",
