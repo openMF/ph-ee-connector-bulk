@@ -1,2 +1,0 @@
-id,request_id,payment_mode,payer_identifier_type,payer_identifier,payee_identifier_type,payee_identifier,amount,currency,note,program_shortcode,cycle,payee_dfsp_id,batch_id,account_number
-5,"z1e22fe3-9740-4fba-97b6-78f43bfa7f0f",closedloop,accountNumber,003001003879112168,accountNumber,400173110195,740,USD,,,,,"5148f47f-6e36-4ba6-8923-be6f3f5aff94",
