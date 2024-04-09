@@ -257,7 +257,7 @@ public class BatchTransferWorker extends BaseWorker {
             transaction.setAmount(transactionFields[7]);
             transaction.setCurrency(transactionFields[8]);
             transaction.setNote(transactionFields[9]);
-            transaction.setBatchId(transactionFields[14]);
+            transaction.setBatchId(transactionFields[13]);
             transactionList.add(transaction);
         }
         return transactionList;
