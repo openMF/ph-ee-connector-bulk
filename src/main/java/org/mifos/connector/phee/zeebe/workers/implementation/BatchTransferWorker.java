@@ -89,7 +89,7 @@ public class BatchTransferWorker extends BaseWorker {
         newWorker(INIT_BATCH_TRANSFER, (client, job) ->{
             Map<String, Object> variables = job.getVariablesAsMap();
             String debulkingDfspId = variables.get(DEBULKINGDFSPID).toString();
-            String payeeDFSPId = variables.get(PAYEE_DFSP_ID) != null ? variables.get(PAYEE_DFSP_ID).toString() : null;
+            String payeeDfspId = variables.get(PAYEE_DFSP_ID) != null ? variables.get(PAYEE_DFSP_ID).toString() : null;
             variables.put("waitTimer", waitTimer);
 
             String paymentMode = (String) variables.get(PAYMENT_MODE);
@@ -112,7 +112,7 @@ public class BatchTransferWorker extends BaseWorker {
             else{
                 String updatedCsvData = updateCsvDataPaymentMode(csvData, filePath);
                 String clientCorrelationId = String.valueOf(UUID.randomUUID());
-                String batchId = invokeBatchTransactionApi(fileName, updatedCsvData, filePath, clientCorrelationId, debulkingDfspId, payeeDFSPId);
+                String batchId = invokeBatchTransactionApi(fileName, updatedCsvData, filePath, clientCorrelationId, debulkingDfspId, payeeDfspId);
                 logger.info("invokeBatchTransactionApi: {}", batchId);
                 if(!ObjectUtils.isEmpty(batchId)){
                     variables.put(INIT_BATCH_TRANSFER_SUCCESS, true);
@@ -170,13 +170,13 @@ public class BatchTransferWorker extends BaseWorker {
         PaymentModeMapping mapping = paymentModeConfiguration.getByMode(paymentMode);
         return mapping != null;
     }
-    public String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId, String tenant, String payeeDFSPId) throws Exception {
+    public String invokeBatchTransactionApi(String filename, String csvData, String filePath, String clientCorrelationId, String tenant, String payeeDfspId) throws Exception {
         String signature = generateSignature(clientCorrelationId, tenant, csvData, true, filePath);
         String batchTransactionUrl = bulkProcessorContactPoint + batchTransactionEndpoint;
         String url = UriComponentsBuilder.fromHttpUrl(batchTransactionUrl)
                 .queryParam("type", "csv").toUriString();
 
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = createHttpEntity(filename, csvData, filePath, clientCorrelationId, tenant, payeeDFSPId, signature);
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = createHttpEntity(filename, csvData, filePath, clientCorrelationId, tenant, payeeDfspId, signature);
         return executeBatchTransactionRequest(url, requestEntity);
     }
 
@@ -195,7 +195,7 @@ public class BatchTransferWorker extends BaseWorker {
                 .build();
     }
 
-    private HttpEntity<MultiValueMap<String, Object>> createHttpEntity(String filename, String csvData, String filePath, String clientCorrelationId, String tenant, String payeeDFSPId, String signature) throws IOException {
+    private HttpEntity<MultiValueMap<String, Object>> createHttpEntity(String filename, String csvData, String filePath, String clientCorrelationId, String tenant, String payeeDfspId, String signature) throws IOException {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.set("purpose", "test payment");
@@ -204,8 +204,8 @@ public class BatchTransferWorker extends BaseWorker {
         headers.set("Platform-TenantId", tenant);
         headers.set("X-SIGNATURE", signature);
         headers.set("Type", "csv");
-        if(payeeDFSPId != null){
-            headers.set("X-PayeeDFSP-ID", payeeDFSPId);
+        if(payeeDfspId != null){
+            headers.set("X-PayeeDFSP-ID", payeeDfspId);
         }
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
