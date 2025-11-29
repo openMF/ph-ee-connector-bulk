@@ -115,6 +115,6 @@ public class ZeebeVariables {
     public static final String HEADER_BILLER_ID = "X-Biller-Id";
     public static final String HEADER_CLIENTCORRELATIONID = "X-Client-Correlation-ID";
     public static final String DEBULKINGDFSPID = "debulkingDfspid";
-
+    public static final String PAYEE_DFSP_ID = "payeeDfspId";
 
 }
