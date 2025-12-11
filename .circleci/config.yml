@@ -23,6 +23,19 @@ jobs:
             echo "export DOCKER_REPO_LOWER=$(echo $CIRCLE_PROJECT_REPONAME | tr '[:upper:]' '[:lower:]')" >> $BASH_ENV
             echo "Using Docker Namespace: $DOCKER_ORG_LOWER"
             echo "Using Docker Repository: $DOCKER_REPO_LOWER"
+          # Add this step to all jobs using the new eclipse-temurin executor
+      - run:
+          name: Install Docker CLI
+          command: |
+            # 1. Update package list
+            sudo apt-get update
+            # 2. Install the Docker client (docker.io)
+            sudo apt-get install -y docker.io
+            # 3. Set the DOCKER_HOST variable to point to the Remote Docker Environment
+            echo 'export DOCKER_HOST="tcp://localhost:2376"' >> $BASH_ENV
+            echo 'export DOCKER_CERT_PATH="/certs/client"' >> $BASH_ENV
+            echo 'export DOCKER_TLS_VERIFY="1"' >> $BASH_ENV
+            source $BASH_ENV
       - docker-buildx/install
       - run:
           name: Check if Docker image tag exists
