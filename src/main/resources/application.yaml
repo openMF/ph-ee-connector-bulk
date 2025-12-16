@@ -47,7 +47,7 @@ dfspids: "DFSPID"
 
 
 operations-app:
-  contactpoint: "https://ops-bk.sandbox.mifos.io"
+  contactpoint: "https://ops-bk.mifos.gazelle.test"
   username: "mifos"
   password: "password"
   endpoints:
@@ -62,9 +62,15 @@ mock-payment-schema:
     batch-detail: "/mockapi/v1/batch/detail"
 
 bulk-processor:
-  contactpoint: "https://ph-ee-processor-bulk:8443"
+  contactpoint: "https://ph-ee-bulk-processor:8443"
   endpoints:
     batch-transaction: "/batchtransactions"
+    batch-execution: "/batchtransactions/execution"
+
+channel:
+  contactpoint: "https://ph-ee-connector-channel:8443"
+  endpoints:
+    transfer: "/channel/transfer"
 
 payment-mode:
   default: "MOJALOOP"

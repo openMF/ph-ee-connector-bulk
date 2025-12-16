@@ -4,6 +4,7 @@ import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.mifos.connector.phee.config.MockPaymentSchemaConfig;
+import org.mifos.connector.phee.config.OperationsAppConfig;
 import org.mifos.connector.phee.schema.BatchDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,9 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
     @Autowired
     public MockPaymentSchemaConfig mockPaymentSchemaConfig;
 
+    @Autowired
+    public OperationsAppConfig operationsAppConfig;
+
     @Value("${tenant}")
     public String tenant;
 
@@ -58,10 +62,10 @@ public class BatchSummaryRoute extends BaseRouteBuilder {
                 .toD("direct:callBatchSummaryEndpoint") // Use a direct endpoint to call the method
                 .log(LoggingLevel.INFO, "Batch summary API response: \n\n ${body}");
 
-// Define a route to call the Spring method
+// Define a route to call operations-app for batch summary
         from("direct:callBatchSummaryEndpoint")
-                .to(mockPaymentSchemaConfig.mockPaymentSchemaContactPoint+"/batches/${exchangeProperty." + BATCH_ID + "}/summary")
-                .log(LoggingLevel.INFO, "Batch summary API response: \n\n ${body}");
+                .to(operationsAppConfig.batchSummaryUrl + "/${exchangeProperty." + BATCH_ID + "}")
+                .log(LoggingLevel.INFO, "Batch summary API response from operations-app: \n\n ${body}");
 
 
         from("direct:batch-summary-response-handler")

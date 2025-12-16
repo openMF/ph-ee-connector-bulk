@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.mifos.connector.phee.config.MockPaymentSchemaConfig;
+import org.mifos.connector.phee.config.OperationsAppConfig;
 import org.mifos.connector.phee.schema.BatchDetailResponse;
 import org.mifos.connector.phee.schema.Transaction;
 import org.mifos.connector.phee.schema.TransactionResult;
@@ -49,6 +50,10 @@ public class BatchDetailRoute extends BaseRouteBuilder {
 
     @Autowired
     public MockPaymentSchemaConfig mockPaymentSchemaConfig;
+
+    @Autowired
+    public OperationsAppConfig operationsAppConfig;
+
     private ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -57,16 +62,32 @@ public class BatchDetailRoute extends BaseRouteBuilder {
         from(RouteId.BATCH_DETAIL.getValue())
                 .id(RouteId.BATCH_DETAIL.getValue())
                 .log("Starting route " + RouteId.BATCH_DETAIL.name())
-                .to("direct:batch-detail-api-call")
-                .to("direct:batch-detail-response-handler");
+                .doTry()
+                    .to("direct:batch-detail-api-call")
+                    .to("direct:batch-detail-response-handler")
+                .doCatch(Exception.class)
+                    .log(LoggingLevel.ERROR, "Error in batch detail route: ${exception.message}")
+                    .process(exchange -> {
+                        exchange.setProperty(BATCH_DETAIL_SUCCESS, false);
+                        exchange.setProperty(ERROR_DESCRIPTION, exchange.getException().getMessage());
+                        exchange.setProperty(ERROR_CODE, "500");
+                    })
+                .end();
 
         from("direct:batch-detail-api-call")
                 .routeId("direct:batch-detail-api-call")
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .setHeader("Accept", constant("application/json"))
-                .toD(mockPaymentSchemaConfig.mockPaymentSchemaContactPoint+"/batches/"+ "${exchangeProperty.batchId}"+"/detail"+ "?" + "pageNo" + "=${exchangeProperty.pageNo}&"  + "pageSize"
-                        + "=${exchangeProperty.pageSize}"  )
-                .log("API Response: ${body}")
+                .process(exchange -> {
+                    String batchId = exchange.getProperty(BATCH_ID, String.class);
+                    String pageNo = exchange.getProperty(PAGE_NO, String.class);
+                    String pageSize = exchange.getProperty("pageSize", String.class);
+                    String url = operationsAppConfig.batchDetailUrl + "?batchId=" + batchId + "&pageNo=" + pageNo + "&pageSize=" + pageSize;
+                    exchange.getIn().setHeader(Exchange.HTTP_URI, url);
+                    logger.info("Calling operations-app batch detail: {}", url);
+                })
+                .toD("${header.CamelHttpUri}")
+                .log("API Response from operations-app: ${body}")
                 .setProperty("apiResponse", body()) ; // Log the API response, you can modify this according to your needs
 
 
