@@ -279,7 +279,7 @@ public class BatchTransferWorker extends BaseWorker {
             transaction.setAmount(transactionFields[7]);
             transaction.setCurrency(transactionFields[8]);
             transaction.setNote(transactionFields[9]);
-            transaction.setBatchId(transactionFields[13]);
+            // batchId is set from Zeebe variables, not from CSV
             transactionList.add(transaction);
         }
         return transactionList;
@@ -338,7 +338,7 @@ public class BatchTransferWorker extends BaseWorker {
                     transaction.getId(), transaction.getAmount());
 
                 // Call channel connector for individual transfer
-                boolean transferSuccess = invokeChannelTransfer(transaction, tenant);
+                boolean transferSuccess = invokeChannelTransfer(transaction, batchId, tenant);
 
                 if (transferSuccess) {
                     successCount++;
@@ -364,7 +364,7 @@ public class BatchTransferWorker extends BaseWorker {
         return failureCount == 0;
     }
 
-    private boolean invokeChannelTransfer(Transaction transaction, String tenant) {
+    private boolean invokeChannelTransfer(Transaction transaction, String batchId, String tenant) {
         try {
             String transferUrl = channelContactPoint + channelTransferEndpoint;
             logger.info("## CLOSEDLOOP - Channel transfer URL: {}", transferUrl);
@@ -372,6 +372,9 @@ public class BatchTransferWorker extends BaseWorker {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Platform-TenantId", tenant);
+            headers.set("X-BatchID", batchId);
+            headers.set("X-CorrelationID", transaction.getRequestId());
+
 
             // Build transfer request body with proper MoneyData structure
             ObjectMapper objectMapper = new ObjectMapper();
