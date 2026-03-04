@@ -82,9 +82,11 @@ public class BatchDetailRoute extends BaseRouteBuilder {
                     String batchId = exchange.getProperty(BATCH_ID, String.class);
                     String pageNo = exchange.getProperty(PAGE_NO, String.class);
                     String pageSize = exchange.getProperty("pageSize", String.class);
+                    String tenantId = exchange.getProperty("tenantId", String.class);
                     String url = operationsAppConfig.batchDetailUrl + "?batchId=" + batchId + "&pageNo=" + pageNo + "&pageSize=" + pageSize;
                     exchange.getIn().setHeader(Exchange.HTTP_URI, url);
-                    logger.info("Calling operations-app batch detail: {}", url);
+                    exchange.getIn().setHeader("Platform-TenantId", tenantId);
+                    logger.info("Calling operations-app batch detail: {} tenant: {}", url, tenantId);
                 })
                 .toD("${header.CamelHttpUri}")
                 .log("API Response from operations-app: ${body}")
