@@ -87,6 +87,9 @@ public class BatchTransferWorker extends BaseWorker {
     @Autowired
     private PaymentModeConfiguration paymentModeConfiguration;
 
+    @Autowired
+    private org.mifos.connector.phee.config.MockPaymentSchemaConfig mockPaymentSchemaConfig;
+
     @Value("${tenant}")
     public String tenant;
 
@@ -123,9 +126,40 @@ public class BatchTransferWorker extends BaseWorker {
             else if("closedloop".equalsIgnoreCase(paymentMode)){
                 logger.info("Processing closedloop batch transfer via channel connector");
                 String batchId = (String) variables.get(BATCH_ID);
-                boolean success = processClosedloopTransfers(transactionList, batchId, debulkingDfspId);
-                variables.put(INIT_BATCH_TRANSFER_SUCCESS, success);
-                logger.info("Closedloop processing complete. Success: {}, batchId: {}", success, batchId);
+                int[] counts = processClosedloopTransfers(transactionList, batchId, debulkingDfspId);
+                int successCount = counts[0];
+                int failureCount = counts[1];
+                long total = transactionList.size();
+
+                variables.put(INIT_BATCH_TRANSFER_SUCCESS, failureCount == 0);
+
+                // Pre-populate batch summary counts so BatchSummaryWorker can use them
+                // if mock-payment-schema returns 0 (it is not informed of closedloop results)
+                variables.put(TOTAL_TRANSACTION, total);
+                variables.put(COMPLETED_TRANSACTION, (long) successCount);
+                variables.put(FAILED_TRANSACTION, (long) failureCount);
+                variables.put(ONGOING_TRANSACTION, 0L);
+
+                double totalAmt = transactionList.stream()
+                        .mapToDouble(t -> t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0)
+                        .sum();
+                double failedAmt = transactionList.stream()
+                        .skip(successCount)
+                        .mapToDouble(t -> t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0)
+                        .sum();
+                double completedAmt = totalAmt - failedAmt;
+                variables.put(TOTAL_AMOUNT, totalAmt);
+                variables.put(COMPLETED_AMOUNT, completedAmt);
+                variables.put(FAILED_AMOUNT, failedAmt);
+                variables.put(ONGOING_AMOUNT, 0.0);
+                variables.put(COMPLETION_RATE, total > 0 ? (long)(((double)(successCount + failureCount) / total) * 100) : 0L);
+
+                logger.info("Closedloop processing complete. Success: {}, Failed: {}, batchId: {}",
+                        successCount, failureCount, batchId);
+
+                // Register actual results with mock-payment-schema so its summary endpoint returns real data
+                registerClosedloopSummary(batchId, debulkingDfspId, total, successCount, failureCount,
+                        totalAmt, completedAmt, failedAmt);
             }
             else{
                 String updatedCsvData = updateCsvDataPaymentMode(csvData, filePath);
@@ -326,7 +360,43 @@ public class BatchTransferWorker extends BaseWorker {
         return jsonWebSignature.getSignature(privateKeyString);
     }
 
-    private boolean processClosedloopTransfers(List<Transaction> transactionList, String batchId, String tenant) {
+    private void registerClosedloopSummary(String batchId, String tenant, long total, int successCount,
+            int failureCount, double totalAmt, double completedAmt, double failedAmt) {
+        try {
+            String url = mockPaymentSchemaConfig.mockPaymentSchemaContactPoint + "/batches/" + batchId + "/summary";
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("batchId", batchId);
+            body.put("total", total);
+            body.put("successful", (long) successCount);
+            body.put("failed", (long) failureCount);
+            body.put("ongoing", 0L);
+            body.put("totalAmount", totalAmt);
+            body.put("successfulAmount", completedAmt);
+            body.put("failedAmount", failedAmt);
+            body.put("pendingAmount", 0.0);
+            body.put("status", failureCount == 0 ? "COMPLETED" : "PARTIALLY_COMPLETED");
+            long successPct = total > 0 ? (long) (((double) successCount / total) * 100) : 0L;
+            body.put("successPercentage", String.valueOf(successPct));
+            body.put("failPercentage", String.valueOf(100 - successPct));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Platform-TenantId", tenant);
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            HttpEntity<String> requestEntity = new HttpEntity<>(objectMapper.writeValueAsString(body), headers);
+
+            RestTemplate restTemplate = createRestTemplate();
+            restTemplate.exchange(url, HttpMethod.PUT, requestEntity, Void.class);
+            logger.info("## CLOSEDLOOP - Registered summary with mock-payment-schema: batchId={}, total={}, success={}, failed={}",
+                    batchId, total, successCount, failureCount);
+        } catch (Exception e) {
+            logger.warn("## CLOSEDLOOP - Failed to register summary with mock-payment-schema: {}", e.getMessage());
+        }
+    }
+
+    private int[] processClosedloopTransfers(List<Transaction> transactionList, String batchId, String tenant) {
         logger.info("## CLOSEDLOOP - Processing {} transactions for batchId: {}", transactionList.size(), batchId);
 
         int successCount = 0;
@@ -361,7 +431,7 @@ public class BatchTransferWorker extends BaseWorker {
         logger.info("## CLOSEDLOOP - Batch {} complete. Success: {}, Failed: {}",
             batchId, successCount, failureCount);
 
-        return failureCount == 0;
+        return new int[]{successCount, failureCount};
     }
 
     private boolean invokeChannelTransfer(Transaction transaction, String batchId, String tenant) {
