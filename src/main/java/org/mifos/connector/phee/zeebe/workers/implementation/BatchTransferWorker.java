@@ -6,10 +6,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.mifos.connector.common.util.JsonWebSignature;
 import org.mifos.connector.phee.config.PaymentModeConfiguration;
 import org.mifos.connector.phee.config.PaymentModeMapping;
@@ -242,8 +245,12 @@ public class BatchTransferWorker extends BaseWorker {
 
     private CloseableHttpClient createHttpClient() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
         return HttpClients.custom()
-                .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build())
-                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                // HttpClient 5: TLS config moved onto the connection manager
+                .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
+                        .setSSLSocketFactory(new SSLConnectionSocketFactory(
+                                new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build(),
+                                NoopHostnameVerifier.INSTANCE))
+                        .build())
                 .build();
     }
 

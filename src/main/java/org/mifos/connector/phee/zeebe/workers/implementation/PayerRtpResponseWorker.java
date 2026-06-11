@@ -1,10 +1,13 @@
 package org.mifos.connector.phee.zeebe.workers.implementation;
 
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.mifos.connector.phee.data.PayerRTPResponse;
 import org.mifos.connector.phee.data.ResponseDTO;
 import org.mifos.connector.phee.zeebe.workers.BaseWorker;
@@ -38,9 +41,13 @@ public class PayerRtpResponseWorker extends BaseWorker {
             RestTemplate restTemplate = new RestTemplate();
             HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
             CloseableHttpClient httpClient = HttpClients.custom()
-                    .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build())
-                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-                    .build();
+                // HttpClient 5: TLS config moved onto the connection manager
+                .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
+                        .setSSLSocketFactory(new SSLConnectionSocketFactory(
+                                new SSLContextBuilder().loadTrustMaterial(null, (certificate, authType) -> true).build(),
+                                NoopHostnameVerifier.INSTANCE))
+                        .build())
+                .build();
             restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory(httpClient));
             String billId = (String) variables.get("billId");
             String transactionId = (String) variables.get("transactionId");
