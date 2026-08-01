@@ -75,7 +75,8 @@ public class BatchDetailWorker extends BaseWorker {
 
             sendToCamelRoute(RouteId.BATCH_DETAIL, exchange);
 
-            boolean isReconciliationSuccess = exchange.getProperty(BATCH_DETAIL_SUCCESS, Boolean.class);
+            Boolean reconciliationResult = exchange.getProperty(BATCH_DETAIL_SUCCESS, Boolean.class);
+            boolean isReconciliationSuccess = reconciliationResult != null ? reconciliationResult : false;
 
             if (!isReconciliationSuccess) {
                 variables.put(ERROR_CODE, exchange.getProperty(ERROR_CODE));
