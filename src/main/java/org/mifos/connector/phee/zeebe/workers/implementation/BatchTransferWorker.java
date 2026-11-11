@@ -44,6 +44,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,11 +72,23 @@ public class BatchTransferWorker extends BaseWorker {
     @Value("${bulk-processor.endpoints.batch-transaction}")
     private String batchTransactionEndpoint;
 
+    @Value("${bulk-processor.endpoints.batch-execution}")
+    private String batchExecutionEndpoint;
+
+    @Value("${channel.contactpoint}")
+    private String channelContactPoint;
+
+    @Value("${channel.endpoints.transfer}")
+    private String channelTransferEndpoint;
+
     @Value("${json_web_signature.privateKey}")
     private String privateKeyString;
 
     @Autowired
     private PaymentModeConfiguration paymentModeConfiguration;
+
+    @Autowired
+    private org.mifos.connector.phee.config.MockPaymentSchemaConfig mockPaymentSchemaConfig;
 
     @Value("${tenant}")
     public String tenant;
@@ -86,6 +99,7 @@ public class BatchTransferWorker extends BaseWorker {
     @Override
     public void setup() {
         logger.info("## generating " + INIT_BATCH_TRANSFER + "zeebe worker");
+        logger.info("## Channel config - contactpoint: {}, endpoint: {}", channelContactPoint, channelTransferEndpoint);
         newWorker(INIT_BATCH_TRANSFER, (client, job) ->{
             Map<String, Object> variables = job.getVariablesAsMap();
             String debulkingDfspId = variables.get(DEBULKINGDFSPID).toString();
@@ -108,6 +122,44 @@ public class BatchTransferWorker extends BaseWorker {
                 String resultFile = String.format("Result_%s", serverFileName);
                 uploadResultFileWithError(transactionList, resultFile);
                 variables.put(INIT_BATCH_TRANSFER_SUCCESS, false);
+            }
+            else if("closedloop".equalsIgnoreCase(paymentMode)){
+                logger.info("Processing closedloop batch transfer via channel connector");
+                String batchId = (String) variables.get(BATCH_ID);
+                int[] counts = processClosedloopTransfers(transactionList, batchId, debulkingDfspId);
+                int successCount = counts[0];
+                int failureCount = counts[1];
+                long total = transactionList.size();
+
+                variables.put(INIT_BATCH_TRANSFER_SUCCESS, failureCount == 0);
+
+                // Pre-populate batch summary counts so BatchSummaryWorker can use them
+                // if mock-payment-schema returns 0 (it is not informed of closedloop results)
+                variables.put(TOTAL_TRANSACTION, total);
+                variables.put(COMPLETED_TRANSACTION, (long) successCount);
+                variables.put(FAILED_TRANSACTION, (long) failureCount);
+                variables.put(ONGOING_TRANSACTION, 0L);
+
+                double totalAmt = transactionList.stream()
+                        .mapToDouble(t -> t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0)
+                        .sum();
+                double failedAmt = transactionList.stream()
+                        .skip(successCount)
+                        .mapToDouble(t -> t.getAmount() != null ? Double.parseDouble(t.getAmount()) : 0.0)
+                        .sum();
+                double completedAmt = totalAmt - failedAmt;
+                variables.put(TOTAL_AMOUNT, totalAmt);
+                variables.put(COMPLETED_AMOUNT, completedAmt);
+                variables.put(FAILED_AMOUNT, failedAmt);
+                variables.put(ONGOING_AMOUNT, 0.0);
+                variables.put(COMPLETION_RATE, total > 0 ? (long)(((double)(successCount + failureCount) / total) * 100) : 0L);
+
+                logger.info("Closedloop processing complete. Success: {}, Failed: {}, batchId: {}",
+                        successCount, failureCount, batchId);
+
+                // Register actual results with mock-payment-schema so its summary endpoint returns real data
+                registerClosedloopSummary(batchId, debulkingDfspId, total, successCount, failureCount,
+                        totalAmt, completedAmt, failedAmt);
             }
             else{
                 String updatedCsvData = updateCsvDataPaymentMode(csvData, filePath);
@@ -261,7 +313,7 @@ public class BatchTransferWorker extends BaseWorker {
             transaction.setAmount(transactionFields[7]);
             transaction.setCurrency(transactionFields[8]);
             transaction.setNote(transactionFields[9]);
-            transaction.setBatchId(transactionFields[13]);
+            // batchId is set from Zeebe variables, not from CSV
             transactionList.add(transaction);
         }
         return transactionList;
@@ -306,6 +358,168 @@ public class BatchTransferWorker extends BaseWorker {
                 .build();
 
         return jsonWebSignature.getSignature(privateKeyString);
+    }
+
+    private void registerClosedloopSummary(String batchId, String tenant, long total, int successCount,
+            int failureCount, double totalAmt, double completedAmt, double failedAmt) {
+        try {
+            String url = mockPaymentSchemaConfig.mockPaymentSchemaContactPoint + "/batches/" + batchId + "/summary";
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("batchId", batchId);
+            body.put("total", total);
+            body.put("successful", (long) successCount);
+            body.put("failed", (long) failureCount);
+            body.put("ongoing", 0L);
+            body.put("totalAmount", totalAmt);
+            body.put("successfulAmount", completedAmt);
+            body.put("failedAmount", failedAmt);
+            body.put("pendingAmount", 0.0);
+            body.put("status", failureCount == 0 ? "COMPLETED" : "PARTIALLY_COMPLETED");
+            long successPct = total > 0 ? (long) (((double) successCount / total) * 100) : 0L;
+            body.put("successPercentage", String.valueOf(successPct));
+            body.put("failPercentage", String.valueOf(100 - successPct));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Platform-TenantId", tenant);
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            HttpEntity<String> requestEntity = new HttpEntity<>(objectMapper.writeValueAsString(body), headers);
+
+            RestTemplate restTemplate = createRestTemplate();
+            restTemplate.exchange(url, HttpMethod.PUT, requestEntity, Void.class);
+            logger.info("## CLOSEDLOOP - Registered summary with mock-payment-schema: batchId={}, total={}, success={}, failed={}",
+                    batchId, total, successCount, failureCount);
+        } catch (Exception e) {
+            logger.warn("## CLOSEDLOOP - Failed to register summary with mock-payment-schema: {}", e.getMessage());
+        }
+    }
+
+    private int[] processClosedloopTransfers(List<Transaction> transactionList, String batchId, String tenant) {
+        logger.info("## CLOSEDLOOP - Processing {} transactions for batchId: {}", transactionList.size(), batchId);
+
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (Transaction transaction : transactionList) {
+            try {
+                logger.info("## CLOSEDLOOP - Processing transaction: {}, amount: {}",
+                    transaction.getId(), transaction.getAmount());
+
+                // Call channel connector for individual transfer
+                boolean transferSuccess = invokeChannelTransfer(transaction, batchId, tenant);
+
+                if (transferSuccess) {
+                    successCount++;
+                    logger.info("## CLOSEDLOOP - Transaction {} succeeded", transaction.getId());
+                } else {
+                    failureCount++;
+                    logger.warn("## CLOSEDLOOP - Transaction {} failed", transaction.getId());
+                }
+
+                // Report execution status to bulk-processor
+                reportExecutionStatus(transaction, batchId, tenant, transferSuccess);
+
+            } catch (Exception e) {
+                failureCount++;
+                logger.error("## CLOSEDLOOP - Error processing transaction {}: {}",
+                    transaction.getId(), e.getMessage(), e);
+            }
+        }
+
+        logger.info("## CLOSEDLOOP - Batch {} complete. Success: {}, Failed: {}",
+            batchId, successCount, failureCount);
+
+        return new int[]{successCount, failureCount};
+    }
+
+    private boolean invokeChannelTransfer(Transaction transaction, String batchId, String tenant) {
+        try {
+            String transferUrl = channelContactPoint + channelTransferEndpoint;
+            logger.info("## CLOSEDLOOP - Channel transfer URL: {}", transferUrl);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Platform-TenantId", tenant);
+            headers.set("X-BatchID", batchId);
+            headers.set("X-CorrelationID", transaction.getRequestId());
+
+
+            // Build transfer request body with proper MoneyData structure
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Object> requestPayload = new HashMap<>();
+
+            // Create MoneyData object for amount
+            Map<String, String> amountData = new HashMap<>();
+            amountData.put("amount", transaction.getAmount());
+            amountData.put("currency", transaction.getCurrency());
+
+            requestPayload.put("amount", amountData);
+            requestPayload.put("payer", createParty(transaction.getPayerIdentifierType(), transaction.getPayerIdentifier()));
+            requestPayload.put("payee", createParty(transaction.getPayeeIdentifierType(), transaction.getPayeeIdentifier()));
+
+            String requestBody = objectMapper.writeValueAsString(requestPayload);
+            logger.info("## CLOSEDLOOP - Channel transfer request body: {}", requestBody);
+
+            HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, headers);
+
+            RestTemplate restTemplate = createRestTemplate();
+            ResponseEntity<String> response = restTemplate.exchange(
+                transferUrl, HttpMethod.POST, requestEntity, String.class);
+
+            logger.info("## CLOSEDLOOP - Channel transfer response status: {} for transaction: {}",
+                response.getStatusCode(), transaction.getId());
+
+            return response.getStatusCode().is2xxSuccessful();
+
+        } catch (Exception e) {
+            logger.error("## CLOSEDLOOP - Channel transfer failed for transaction {}: {}",
+                transaction.getId(), e.getMessage(), e);
+            return false;
+        }
+    }
+
+    private Map<String, Object> createParty(String idType, String idValue) {
+        Map<String, String> partyIdInfo = new HashMap<>();
+        partyIdInfo.put("partyIdType", idType);
+        partyIdInfo.put("partyIdentifier", idValue);
+
+        Map<String, Object> party = new HashMap<>();
+        party.put("partyIdInfo", partyIdInfo);
+        return party;
+    }
+
+    private void reportExecutionStatus(Transaction transaction, String batchId, String tenant, boolean success) {
+        try {
+            String executionUrl = bulkProcessorContactPoint + batchExecutionEndpoint;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.set("Platform-TenantId", tenant);
+            headers.set("X-CorrelationID", batchId);
+
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("transactionId", transaction.getId());
+            body.add("batchId", batchId);
+            body.add("status", success ? "SUCCESS" : "FAILED");
+            body.add("completedTimestamp", System.currentTimeMillis());
+            body.add("amount", transaction.getAmount());
+            body.add("currency", transaction.getCurrency());
+
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+
+            RestTemplate restTemplate = createRestTemplate();
+            ResponseEntity<String> response = restTemplate.exchange(
+                executionUrl, HttpMethod.POST, requestEntity, String.class);
+
+            logger.info("## CLOSEDLOOP - Execution status reported for transaction {}: {}",
+                transaction.getId(), response.getStatusCode());
+
+        } catch (Exception e) {
+            logger.error("## CLOSEDLOOP - Failed to report execution status for transaction {}: {}",
+                transaction.getId(), e.getMessage(), e);
+        }
     }
 
 

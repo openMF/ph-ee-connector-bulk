@@ -8,18 +8,24 @@ plugins {
 }
 
 group = 'org.mifos'
-version = '0.0.1-SNAPSHOT'
+version = '2.0.0.mifos-SNAPSHOT'
 sourceCompatibility = '17'
 
+
 repositories {
-	mavenCentral()
-	maven { url "https://repo.spring.io/libs-release" }
-	maven { url "https://repository.jboss.org/nexus/content/repositories/releases" }
-	maven { url "https://jfrog.sandbox.fynarfin.io/artifactory/fyn-libs-snapshot"}
-	maven {
-		url = uri('https://jfrog.sandbox.fynarfin.io/artifactory/fyn-libs-snapshot')
-	}
+    mavenCentral()
+    // mavenLocal()
+    maven {
+        url = uri('https://repo.maven.apache.org/maven2/')
+    }
+    maven {
+        url = uri('https://mifos.jfrog.io/artifactory/phee-gradle-local')
+    }    
+    maven {
+        url = uri('https://mifos.jfrog.io/artifactory/mifosx-gradle-local')
+    }
 }
+
 ext {
 	camelVersion = '3.18.1'
 	zeebClientVersion = '1.3.1'
@@ -28,7 +34,8 @@ ext {
 dependencies {
 	implementation 'com.google.code.gson:gson:2.8.9'
 	implementation 'org.json:json:20210307'
-	implementation 'org.mifos:ph-ee-connector-common:1.8.1-SNAPSHOT'
+	implementation 'org.mifos:ph-ee-connector-common:1.8.1-gazelle'
+	// implementation 'org.mifos:ph-ee-connector-common:1.8.1-SNAPSHOT'
 	implementation 'org.apache.camel.springboot:camel-spring-boot-starter:3.4.0'
 	implementation 'org.apache.camel:camel-undertow:3.4.0'
 	implementation 'org.springframework.boot:spring-boot-starter:2.5.2'

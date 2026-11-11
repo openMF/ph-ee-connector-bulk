@@ -74,20 +74,29 @@ public class BatchSummaryWorker extends BaseWorker {
 
             variables.put(MAX_RETRY_COUNT, maxRetryCount);
             variables.put(CURRENT_RETRY_COUNT, ++currentRetryCount);
-            variables.put(ONGOING_TRANSACTION, batchDTO.getOngoing());
-            variables.put(FAILED_TRANSACTION, batchDTO.getFailed());
-            variables.put(TOTAL_TRANSACTION, batchDTO.getTotal());
-            variables.put(COMPLETED_TRANSACTION, batchDTO.getSuccessful());
-            variables.put(ONGOING_AMOUNT, batchDTO.getPendingAmount());
-            variables.put(FAILED_AMOUNT, batchDTO.getFailedAmount());
-            variables.put(COMPLETED_AMOUNT, batchDTO.getSuccessfulAmount());
-            variables.put(TOTAL_AMOUNT, batchDTO.getTotalAmount());
-            long percentage = (long)(((double)
-                    (batchDTO.getSuccessful() + batchDTO.getFailed())/batchDTO.getTotal()) *100);
-            variables.put(COMPLETION_RATE, percentage);
 
-            if(batchDTO!=null) {
+            // Check if Zeebe already has counts pre-populated (closedloop path sets these in BatchTransferWorker)
+            long preSetTotal = variables.containsKey(TOTAL_TRANSACTION) ?
+                    ((Number) variables.get(TOTAL_TRANSACTION)).longValue() : 0L;
+            boolean hasMockPaymentSchemaData = batchDTO != null && batchDTO.getTotal() != null && batchDTO.getTotal() > 0;
 
+            if (hasMockPaymentSchemaData) {
+                // Normal path (mojaloop): use mock-payment-schema values
+                variables.put(ONGOING_TRANSACTION, batchDTO.getOngoing());
+                variables.put(FAILED_TRANSACTION, batchDTO.getFailed());
+                variables.put(TOTAL_TRANSACTION, batchDTO.getTotal());
+                variables.put(COMPLETED_TRANSACTION, batchDTO.getSuccessful());
+                variables.put(ONGOING_AMOUNT, batchDTO.getPendingAmount());
+                variables.put(FAILED_AMOUNT, batchDTO.getFailedAmount());
+                variables.put(COMPLETED_AMOUNT, batchDTO.getSuccessfulAmount());
+                variables.put(TOTAL_AMOUNT, batchDTO.getTotalAmount());
+                long percentage = (long)(((double)
+                        (batchDTO.getSuccessful() + batchDTO.getFailed()) / batchDTO.getTotal()) * 100);
+                variables.put(COMPLETION_RATE, percentage);
+                variables.put(BATCH_SUMMARY_SUCCESS, true);
+            } else if (preSetTotal > 0) {
+                // Closedloop path: counts already set by BatchTransferWorker — keep them, just signal success
+                logger.info("mock-payment-schema returned 0/null total but Zeebe has pre-set counts (total={}). Using pre-set values (closedloop path).", preSetTotal);
                 variables.put(BATCH_SUMMARY_SUCCESS, true);
             } else {
                 variables.put(ERROR_CODE, exchange.getProperty(ERROR_CODE));
